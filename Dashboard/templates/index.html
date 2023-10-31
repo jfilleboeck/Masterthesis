@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <title>Interactive Plot</title>
     <style>
@@ -25,16 +26,22 @@
         <label for="new-y-value" class="mr-2">New y-value:</label>
         <input type="number" class="form-control mr-2" style="width: 120px;" id="new-y-value">
 
-        <button class="btn btn-primary mr-2" onclick="setConstantValue()">Set Constant Value</button>
-        <button class="btn btn-info mr-2" onclick="setMonotonicIncrease()">Monotonic Increase</button>
-        <button class="btn btn-info mr-2" onclick="setMonotonicDecrease()">Monotonic Decrease</button>
-        <button class="btn btn-secondary mr-2" onclick="resetGraph()">Set back</button>
-        <button class="btn btn-danger" onclick="undoLastChange()">Undo</button>
+        <button class="btn btn-primary mr-2" onclick="setConstantValue(); return false;">Set Constant Value</button>
+        <button class="btn btn-info mr-2" onclick="setMonotonicIncrease(); return false;">Monotonic Increase</button>
+        <button class="btn btn-info mr-2" onclick="setMonotonicDecrease(); return false;">Monotonic Decrease</button>
+        <button class="btn btn-secondary mr-2" onclick="resetGraph(); return false;">Set back</button>
+        <button class="btn btn-danger" onclick="undoLastChange(); return false;">Undo</button>
+
+        <button class="btn btn-warning mr-2" onclick="toggleView(); return false;">Toggle View</button>
+
+
     </form>
 </div>
-
+<div id="d3plot" style="display:none;"></div>
 
     <script>
+        let isD3View = false;
+        let svgWidth = 960, svgHeight = 200; // Adjusted to 24cm x 5cm (assuming 40 pixels per cm)
         const xData = {{ x_data|tojson }};
         const yData = {{ y_data|tojson }};
 
@@ -130,7 +137,97 @@
                 }
             });
         }
+        let d3Data = xData.map((d, i) => ({ x: d, y: yData[i] }));
 
+        function switchToD3() {
+            document.getElementById('plot').style.display = "none";
+            document.getElementById('d3plot').style.display = "block";
+
+            let svgWidth = 960, svgHeight = 200;  // Adjusted to match the original plot size
+            let margin = { top: 20, right: 20, bottom: 30, left: 50 };
+            let width = svgWidth - margin.left - margin.right;
+            let height = svgHeight - margin.top - margin.bottom;
+
+            d3.select("#d3plot").html("");  // Clear previous SVG if any
+
+            let svg = d3.select("#d3plot")
+                .append("svg")
+                .attr("width", svgWidth)
+                .attr("height", svgHeight)
+                .append("g")
+                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+            let xScale = d3.scaleLinear().range([0, width]).domain([Math.min(...xData), Math.max(...xData)]);
+            let yScale = d3.scaleLinear().range([height, 0]).domain([Math.min(...yData), Math.max(...yData)]);
+
+            let line = d3.line()
+                .x(d => xScale(d.x))
+                .y(d => yScale(d.y));
+
+            svg.append("path")
+                .datum(d3Data)
+                .attr("class", "line")
+                .attr("d", line)
+                .attr("fill", "none")
+                .attr("stroke", "blue")
+                .attr("stroke-width", 2);
+
+            svg.selectAll(".dot")
+                .data(d3Data)
+                .enter().append("circle")
+                .attr("class", "dot")
+                .attr("cx", d => xScale(d.x))
+                .attr("cy", d => yScale(d.y))
+                .attr("r", 5)  // Set the circle size
+                .attr("opacity", 0)  // Make the circle transparent
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+
+            // Add X Axis
+            svg.append("g")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(xScale));
+
+            // Add Y Axis
+            svg.append("g")
+                .call(d3.axisLeft(yScale));
+
+            function dragstarted(event, d) {
+                d3.select(this).raise().attr("fill", "red");
+            }
+
+            function dragged(event, d) {
+                d.y = yScale.invert(event.y);
+                let index = d3Data.indexOf(d);
+                yData[index] = d.y;
+                d3.select(this).attr("cy", yScale(d.y));
+                svg.select(".line").attr("d", line);
+            }
+
+            function dragended(event, d) {
+                d3.select(this).attr("fill", "none");
+            }
+        }
+
+
+
+
+        function toggleView() {
+        if (isD3View) {
+            // Switch to Plotly view
+            d3Data = xData.map((d, i) => ({ x: d, y: yData[i] }));
+
+            document.getElementById('d3plot').style.display = "none";
+            document.getElementById('plot').style.display = "block";
+            isD3View = false;
+        } else {
+            // Switch to D3 view
+            switchToD3();
+            isD3View = true;
+        }
+    }
 
     </script>
 </body>
