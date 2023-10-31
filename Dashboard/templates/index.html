@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <title>Interactive Plot</title>
+    <style>
+        .control-panel {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body class="container mt-5">
+    <div id="plot"></div>
+<div class="control-panel mt-4">
+    <form class="form-inline">
+        <label for="x1-value" class="mr-2">x1:</label>
+        <input type="number" class="form-control mr-2" style="width: 100px;" id="x1-value">
+
+        <label for="x2-value" class="mr-2">x2:</label>
+        <input type="number" class="form-control mr-2" style="width: 100px;" id="x2-value">
+
+        <label for="new-y-value" class="mr-2">New y-value:</label>
+        <input type="number" class="form-control mr-2" style="width: 120px;" id="new-y-value">
+
+        <button class="btn btn-primary mr-2" onclick="setConstantValue()">Set Constant Value</button>
+        <button class="btn btn-info mr-2" onclick="setMonotonicIncrease()">Monotonic Increase</button>
+        <button class="btn btn-info mr-2" onclick="setMonotonicDecrease()">Monotonic Decrease</button>
+        <button class="btn btn-secondary mr-2" onclick="resetGraph()">Set back</button>
+        <button class="btn btn-danger" onclick="undoLastChange()">Undo</button>
+    </form>
+</div>
+
+
+    <script>
+        const xData = {{ x_data|tojson }};
+        const yData = {{ y_data|tojson }};
+
+        const plotData = [{
+            x: xData,
+            y: yData,
+            mode: 'lines',
+            type: 'scatter'
+        }];
+
+        const layout = {
+            dragmode: 'select'
+        };
+
+        Plotly.newPlot('plot', plotData, layout);
+
+        document.getElementById('plot').on('plotly_selected', function(data) {
+            if (!data) return;
+            const x1 = data.range.x[0];
+            const x2 = data.range.x[1];
+            document.getElementById('x1-value').value = x1.toFixed(2);
+            document.getElementById('x2-value').value = x2.toFixed(2);
+        });
+
+        function setConstantValue() {
+            const x1 = parseFloat(document.getElementById('x1-value').value);
+            const x2 = parseFloat(document.getElementById('x2-value').value);
+            const newYValue = parseFloat(document.getElementById('new-y-value').value);
+
+            fetch('/setConstantValue', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({x1: x1, x2: x2, new_y: newYValue})
+            })
+            .then(response => response.json())
+            .then(data => {
+                Plotly.update('plot', {y: [data.y]});
+            });
+        }
+
+        function setMonotonicIncrease() {
+            const x1 = parseFloat(document.getElementById('x1-value').value);
+            const x2 = parseFloat(document.getElementById('x2-value').value);
+
+            fetch('/monotonic_increase', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({x1: x1, x2: x2})
+            })
+            .then(response => response.json())
+            .then(data => {
+                Plotly.update('plot', {y: [data.y]});
+            });
+        }
+
+        function setMonotonicDecrease() {
+            const x1 = parseFloat(document.getElementById('x1-value').value);
+            const x2 = parseFloat(document.getElementById('x2-value').value);
+
+            fetch('/monotonic_decrease', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({x1: x1, x2: x2})
+            })
+            .then(response => response.json())
+            .then(data => {
+                Plotly.update('plot', {y: [data.y]});
+            });
+        }
+
+        function resetGraph() {
+            fetch('/get_original_data')
+            .then(response => response.json())
+            .then(data => {
+                Plotly.update('plot', {x: [data.x], y: [data.y]});
+            });
+        }
+
+        function undoLastChange() {
+            fetch('/undo_last_change')
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    Plotly.update('plot', {y: [data.y]});
+                }
+            });
+        }
+
+
+    </script>
+</body>
+</html>
