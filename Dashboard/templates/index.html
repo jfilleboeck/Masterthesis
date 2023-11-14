@@ -11,9 +11,23 @@
         .control-panel {
             margin-top: 20px;
         }
+        #plot {
+            margin-top: 30px; /* Adjust the value as needed for spacing */
+        }
+        .control-panel {
+            margin-top: 30px; /* Keep or adjust existing spacing above control panel */
+        }
     </style>
 </head>
 <body class="container mt-5">
+    <label for="feature-select" class="mr-2">Select Feature:</label>
+    <!-- Hier noch einfügen, dass das erste numerische Feature angezeigt wird -->
+    <select id="feature-select" class="form-control mr-2">
+        <!-- Options will be dynamically populated -->
+        {% for item in feature_names %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+    </select>
     <div id="plot"></div>
 <div class="control-panel mt-4">
     <form class="form-inline">
@@ -32,39 +46,87 @@
         <button class="btn btn-secondary mr-2" onclick="resetGraph(); return false;">Set back</button>
         <button class="btn btn-danger" onclick="undoLastChange(); return false;">Undo</button>
 
-        <button class="btn btn-warning mr-2" onclick="toggleView(); return false;">Toggle View</button>
-
+        <button class="btn btn-success mr-2" onclick="predictAndGetMSE(); return false;">Get MSE</button>
+        <div id="mse-output" class="alert alert-info">Calculating MSE...</div>
+        <button class="btn btn-info mr-2" onclick="performCubicSplineInterpolation(); return false;">Cubic Spline Interpolation</button>
 
     </form>
 </div>
-<div id="d3plot" style="display:none;"></div>
 
     <script>
-        let isD3View = false;
-        let svgWidth = 960, svgHeight = 200; // Adjusted to 24cm x 5cm (assuming 40 pixels per cm)
-        const xData = {{ x_data|tojson }};
-        const yData = {{ y_data|tojson }};
-
+        // Variables for creating the plot
         const plotData = [{
-            x: xData,
-            y: yData,
+            x: {{ x_data|tojson }},
+            y: {{ y_data|tojson }},
             mode: 'lines',
             type: 'scatter'
         }];
 
         const layout = {
-            dragmode: 'select'
+            dragmode: 'select',
+            autosize: true,
+            responsive: true
         };
 
-        Plotly.newPlot('plot', plotData, layout);
+        let selectedFeature = document.getElementById('feature-select').value;
 
-        document.getElementById('plot').on('plotly_selected', function(data) {
-            if (!data) return;
-            const x1 = data.range.x[0];
-            const x2 = data.range.x[1];
-            document.getElementById('x1-value').value = x1.toFixed(2);
-            document.getElementById('x2-value').value = x2.toFixed(2);
+        // Create the plot and store x1 and x2 values of bounding boxes
+        Plotly.newPlot('plot', plotData, layout).then(() => {
+            console.log("Plot created");
+            store_x_values();
         });
+
+        function store_x_values() {
+            console.log("Calculating x values");
+            document.getElementById('plot').on('plotly_selected', function(data) {
+                if (!data) return;
+                const x1 = data.range.x[0];
+                const x2 = data.range.x[1];
+                document.getElementById('x1-value').value = x1.toFixed(2);
+                document.getElementById('x2-value').value = x2.toFixed(2);
+            });
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectBox = document.getElementById('feature-select');
+            // Event listener for feature selection change
+            selectBox.addEventListener('change', function () {
+                let selectedFeature = selectBox.value;
+                fetchFeatureData(selectedFeature);
+            });
+            predictAndGetMSE();
+            fetchFeatureData(selectBox.value);
+        });
+
+        function fetchFeatureData(selected_feature) {
+            fetch('/feature_data', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({selected_feature: selected_feature}),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error:', data.error);
+                    } else {
+                        Plotly.newPlot('plot', [{
+                            x: data.x,
+                            y: data.y,
+                            type: 'scatter',
+                            mode: 'lines'
+                        }], layout);
+                        store_x_values();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+
+
 
         function setConstantValue() {
             const x1 = parseFloat(document.getElementById('x1-value').value);
@@ -76,7 +138,7 @@
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({x1: x1, x2: x2, new_y: newYValue})
+                body: JSON.stringify({x1: x1, x2: x2, new_y: newYValue, selected_feature: selectedFeature})
             })
             .then(response => response.json())
             .then(data => {
@@ -137,97 +199,7 @@
                 }
             });
         }
-        let d3Data = xData.map((d, i) => ({ x: d, y: yData[i] }));
 
-        function switchToD3() {
-            document.getElementById('plot').style.display = "none";
-            document.getElementById('d3plot').style.display = "block";
-
-            let svgWidth = 960, svgHeight = 200;  // Adjusted to match the original plot size
-            let margin = { top: 20, right: 20, bottom: 30, left: 50 };
-            let width = svgWidth - margin.left - margin.right;
-            let height = svgHeight - margin.top - margin.bottom;
-
-            d3.select("#d3plot").html("");  // Clear previous SVG if any
-
-            let svg = d3.select("#d3plot")
-                .append("svg")
-                .attr("width", svgWidth)
-                .attr("height", svgHeight)
-                .append("g")
-                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
-            let xScale = d3.scaleLinear().range([0, width]).domain([Math.min(...xData), Math.max(...xData)]);
-            let yScale = d3.scaleLinear().range([height, 0]).domain([Math.min(...yData), Math.max(...yData)]);
-
-            let line = d3.line()
-                .x(d => xScale(d.x))
-                .y(d => yScale(d.y));
-
-            svg.append("path")
-                .datum(d3Data)
-                .attr("class", "line")
-                .attr("d", line)
-                .attr("fill", "none")
-                .attr("stroke", "blue")
-                .attr("stroke-width", 2);
-
-            svg.selectAll(".dot")
-                .data(d3Data)
-                .enter().append("circle")
-                .attr("class", "dot")
-                .attr("cx", d => xScale(d.x))
-                .attr("cy", d => yScale(d.y))
-                .attr("r", 5)  // Set the circle size
-                .attr("opacity", 0)  // Make the circle transparent
-                .call(d3.drag()
-                    .on("start", dragstarted)
-                    .on("drag", dragged)
-                    .on("end", dragended));
-
-            // Add X Axis
-            svg.append("g")
-                .attr("transform", "translate(0," + height + ")")
-                .call(d3.axisBottom(xScale));
-
-            // Add Y Axis
-            svg.append("g")
-                .call(d3.axisLeft(yScale));
-
-            function dragstarted(event, d) {
-                d3.select(this).raise().attr("fill", "red");
-            }
-
-            function dragged(event, d) {
-                d.y = yScale.invert(event.y);
-                let index = d3Data.indexOf(d);
-                yData[index] = d.y;
-                d3.select(this).attr("cy", yScale(d.y));
-                svg.select(".line").attr("d", line);
-            }
-
-            function dragended(event, d) {
-                d3.select(this).attr("fill", "none");
-            }
-        }
-
-
-
-
-        function toggleView() {
-        if (isD3View) {
-            // Switch to Plotly view
-            d3Data = xData.map((d, i) => ({ x: d, y: yData[i] }));
-
-            document.getElementById('d3plot').style.display = "none";
-            document.getElementById('plot').style.display = "block";
-            isD3View = false;
-        } else {
-            // Switch to D3 view
-            switchToD3();
-            isD3View = true;
-        }
-    }
 
     </script>
 </body>
