@@ -36,8 +36,6 @@ feature_history = {feature['name']: [feature['y']] for feature in shape_function
 feature_current_state = {feature['name']: feature['y'] for feature in shape_functions_dict}
 
 
-
-
 @app.route('/')
 def index():
     # Render with all features available to choose from
@@ -56,10 +54,8 @@ def feature_data():
     data = request.json
     selected_feature = data['selected_feature']
     feature_data = next((item for item in shape_functions_dict if item['name'] == selected_feature), None)
-    print(data)
     if feature_data:
         x_data = feature_data['x'].tolist()
-        print(x_data)
         y_data = feature_current_state[selected_feature].tolist()
         return jsonify({'x': x_data, 'y': y_data, 'selected_feature': selected_feature})
     else:
@@ -68,10 +64,8 @@ def feature_data():
 @app.route('/setConstantValue', methods=['POST'])
 def setConstantValue():
     data = request.json
-    print(data)
     selected_feature = data['selected_feature']
     x1, x2, new_y = data['x1'], data['x2'], float(data['new_y'])
-    print(data)
 
     y_data = feature_current_state[selected_feature]
     x_data = next(item for item in shape_functions_dict if item['name'] == selected_feature)['x'].tolist()
@@ -98,53 +92,122 @@ def find_nearest(array, value):
 
 @app.route('/monotonic_increase', methods=['POST'])
 def monotonic_increase():
-    history.append(y_data.copy())
     data = request.json
+    selected_feature = data['selected_feature']
+
+    y_data = feature_current_state[selected_feature]
+    x_data = next(item for item in shape_functions_dict if item['name'] == selected_feature)['x'].tolist()
+
+    feature_history[selected_feature].append(y_data.copy())
+
     x1, x2 = data['x1'], data['x2']
-    start_index = find_nearest(x_data, x1)
+    start_index = max(find_nearest(x_data, x1), 1)  # Ensure start_index is greater than 0
     end_index = find_nearest(x_data, x2)
 
-    interpolated_values = np.linspace(y_data[start_index], y_data[end_index], end_index - start_index + 1)
+    # Ensure increase is monotonic
+    for i in range(start_index, end_index + 1):  # Include end_index in the loop
+        y_data[i] = max(y_data[i], y_data[i-1])
 
-    for i, y_val in zip(range(start_index, end_index + 1), interpolated_values):
-        y_data[i] = y_val
+    feature_current_state[selected_feature] = y_data
 
-    return jsonify({'y': y_data})
+    return jsonify({'y': y_data.tolist()})
+
 
 @app.route('/monotonic_decrease', methods=['POST'])
 def monotonic_decrease():
-    history.append(y_data.copy())
     data = request.json
+    selected_feature = data['selected_feature']  # Obtain the feature_name from the request
+
+    y_data = feature_current_state[selected_feature]
+    x_data = next(item for item in shape_functions_dict if item['name'] == selected_feature)['x'].tolist()
+
+    # Record current state before making changes
+    feature_history[selected_feature].append(y_data.copy())
+
+    # Get start and end index for the selected x range
     x1, x2 = data['x1'], data['x2']
     start_index = find_nearest(x_data, x1)
     end_index = find_nearest(x_data, x2)
 
-    interpolated_values = np.linspace(y_data[start_index], y_data[end_index], end_index - start_index + 1)
+    # Ensure decrease is monotonic by only decreasing if the next point is not higher
+    for i in range(end_index, start_index, -1):
+        y_data[i - 1] = min(y_data[i - 1], y_data[i])
 
-    for i, y_val in zip(range(start_index, end_index + 1), interpolated_values):
-        y_data[i] = y_val
+    # Make sure the starting point is not lower than the end point if they are out of order
+    if y_data[start_index] < y_data[end_index]:
+        y_data[start_index] = y_data[end_index]
 
-    return jsonify({'y': y_data})
+    # Save the modified state
+    feature_current_state[selected_feature] = y_data
 
-@app.route('/get_original_data', methods=['GET'])
+    return jsonify({'y': y_data.tolist()})
+
+@app.route('/cubic_spline_interpolate', methods=['POST'])
+def cubic_spline_interpolate():
+    data = request.json
+    selected_feature = data['selected_feature']  # Obtain the feature name from the request
+    # Ensure the feature's data is in the current state
+    if selected_feature not in feature_current_state:
+        # If not, use model's data
+        feature_data_dict = next(item for item in shape_functions_dict if item['name'] == selected_feature)
+        feature_current_state[selected_feature] = feature_data_dict['y']
+
+    # Access the specific feature's current y_data
+    y_data = feature_current_state[selected_feature]
+    x_data = next(item for item in shape_functions_dict if item['name'] == selected_feature)['x'].tolist()
+
+    #if selected_feature not in feature_history:
+    #    feature_history[selected_feature] = []
+
+    #feature_history[selected_feature].append(y_data.copy())
+
+
+    cs = CubicSpline(x_data, y_data)
+
+    #xnew = np.linspace(min(x_data), max(x_data), len(x_data) * 10)  # increase density of x for a smooth plot
+    ynew = cs(x_data)
+
+    #feature_current_state[selected_feature] = ynew.tolist()
+
+    return jsonify({'x': x_data, 'y': ynew.tolist()})
+
+@app.route('/predict_and_get_mse', methods=['GET'])
+def predict_and_get_mse():
+    # Use the global model to predict and calculate MSE
+    y_train_pred = model.predict(X_train)
+    y_test_pred = model.predict(X_test)
+
+    mse_train = mean_squared_error(y_train, y_train_pred)
+    mse_test = mean_squared_error(y_test, y_test_pred)
+
+    # Return the MSE values as JSON
+    return jsonify({'mse_train': mse_train, 'mse_test': mse_test})
+
+
+@app.route('/get_original_data', methods=['POST'])
 def get_original_data():
-    #history.append(y_data.copy())
-    global x_data, y_data
-    data_dict = next(item for item in model.get_shape_functions_as_dict() if item['name'] == 's1')
+    data = request.json
+    selected_feature = data['selected_feature']
+    #global x_data, y_data
+    data_dict = next(item for item in model.get_shape_functions_as_dict() if item['name'] == selected_feature)
     x_data = data_dict['x'].tolist()
     y_data = data_dict['y'].tolist()
     return jsonify({'x': x_data, 'y': y_data})
 
-@app.route('/undo_last_change', methods=['GET'])
+@app.route('/undo_last_change', methods=['POST'])
 def undo_last_change():
-    if len(history) > 1:
-        # Pop the current data, and set y_data to the previous one
-        history.pop()
-        global y_data
-        y_data = history[-1]
-        return jsonify({'y': y_data})
+    data = request.json
+    print(data)
+    selected_feature = data['selected_feature']
+
+    if selected_feature in feature_history and len(feature_history[selected_feature]) > 1:
+        feature_history[selected_feature].pop()  # Remove the last change
+        feature_current_state[selected_feature] = feature_history[selected_feature][-1]  # Revert to the previous state
+        y_data = feature_current_state[selected_feature]  # Update y_data to the reverted state
+        return jsonify({'y': y_data.tolist()})
     else:
-        return jsonify({'error': 'No more changes to undo'}), 400
+        return jsonify({'error': 'No more changes to undo for feature ' + selected_feature}), 400
+
 
 
 

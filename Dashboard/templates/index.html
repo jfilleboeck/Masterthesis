@@ -49,7 +49,6 @@
         <button class="btn btn-success mr-2" onclick="predictAndGetMSE(); return false;">Get MSE</button>
         <div id="mse-output" class="alert alert-info">Calculating MSE...</div>
         <button class="btn btn-info mr-2" onclick="performCubicSplineInterpolation(); return false;">Cubic Spline Interpolation</button>
-
     </form>
 </div>
 
@@ -91,11 +90,11 @@
             const selectBox = document.getElementById('feature-select');
             // Event listener for feature selection change
             selectBox.addEventListener('change', function () {
-                let selectedFeature = selectBox.value;
+                selectedFeature = selectBox.value;
                 fetchFeatureData(selectedFeature);
             });
             predictAndGetMSE();
-            fetchFeatureData(selectBox.value);
+            //fetchFeatureData(selectBox.value);
         });
 
         function fetchFeatureData(selected_feature) {
@@ -118,15 +117,13 @@
                             mode: 'lines'
                         }], layout);
                         store_x_values();
+
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
                 });
         }
-
-
-
 
         function setConstantValue() {
             const x1 = parseFloat(document.getElementById('x1-value').value);
@@ -155,7 +152,7 @@
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({x1: x1, x2: x2})
+                body: JSON.stringify({x1: x1, x2: x2, selected_feature: selectedFeature})
             })
             .then(response => response.json())
             .then(data => {
@@ -172,7 +169,7 @@
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({x1: x1, x2: x2})
+                body: JSON.stringify({x1: x1, x2: x2, selected_feature: selectedFeature})
             })
             .then(response => response.json())
             .then(data => {
@@ -180,8 +177,69 @@
             });
         }
 
+        function performCubicSplineInterpolation() {
+            const selectedFeature = document.getElementById('feature-select').value;
+
+            fetch('/cubic_spline_interpolate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ selected_feature: selectedFeature })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error occurred: ' + data.error);
+                } else {
+                    // If the spline interpolation was successful, add the new trace to the plot
+                    var newTrace = {
+                        x: data.x,
+                        y: data.y,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Spline'
+                    };
+
+                    Plotly.addTraces('plot', newTrace);
+                }
+            })
+            .catch(error => {
+                console.error('An error occurred:', error);
+                alert('An error occurred: ' + error.message);
+            });
+        }
+
+        function predictAndGetMSE() {
+            fetch('/predict_and_get_mse')
+            .then(response => response.json())
+            .then(data => {
+                // Create the MSE output content
+                let mseOutputContent = 'Mean Squared Error on Training Set: ' + data.mse_train.toFixed(2) +
+                                       '<br>Mean Squared Error on Testing Set: ' + data.mse_test.toFixed(2);
+
+                // Set the content to the mse-output div and show it
+                let mseOutputDiv = document.getElementById('mse-output');
+                mseOutputDiv.innerHTML = mseOutputContent;
+                mseOutputDiv.style.display = 'block';
+            })
+            .catch(error => {
+                // If there's an error, display it in the mse-output div
+                let mseOutputDiv = document.getElementById('mse-output');
+                mseOutputDiv.className = 'alert alert-danger';
+                mseOutputDiv.innerHTML = 'Error: ' + error;
+                mseOutputDiv.style.display = 'block';
+            });
+        }
+
         function resetGraph() {
-            fetch('/get_original_data')
+            fetch('/get_original_data', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({selected_feature: selectedFeature})
+            })
             .then(response => response.json())
             .then(data => {
                 Plotly.update('plot', {x: [data.x], y: [data.y]});
@@ -189,7 +247,13 @@
         }
 
         function undoLastChange() {
-            fetch('/undo_last_change')
+            fetch('/undo_last_change', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({selected_feature: selectedFeature})
+            })
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
@@ -199,7 +263,6 @@
                 }
             });
         }
-
 
     </script>
 </body>
