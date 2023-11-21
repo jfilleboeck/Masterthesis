@@ -49,6 +49,7 @@
         <button class="btn btn-success mr-2" onclick="predictAndGetMSE(); return false;">Get MSE</button>
         <div id="mse-output" class="alert alert-info">Calculating MSE...</div>
         <button class="btn btn-info mr-2" onclick="performCubicSplineInterpolation(); return false;">Cubic Spline Interpolation</button>
+        <btton class="btn btn-info mr-2" onclick="updateModel(); return false;">Update Model</btton>
     </form>
 </div>
 
@@ -263,6 +264,28 @@
                 }
             });
         }
+
+        function updateModel() {
+            fetch('/update_model', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({selected_feature: selectedFeature})
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Create the MSE output content
+                let mseOutputContent = 'Mean Squared Error on Training Set: ' + data.mse_train.toFixed(2) +
+                                       '<br>Mean Squared Error on Testing Set: ' + data.mse_test.toFixed(2);
+
+                // Set the content to the mse-output div and show it
+                let mseOutputDiv = document.getElementById('mse-output');
+                mseOutputDiv.innerHTML = mseOutputContent;
+                mseOutputDiv.style.display = 'block';
+            })
+        }
+
 
     </script>
 </body>

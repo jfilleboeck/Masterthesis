@@ -8,39 +8,33 @@ from igann import IGANN
 from sklearn.metrics import mean_squared_error
 from scipy.interpolate import CubicSpline
 
+from data_preprocessing import load_and_preprocess_data
+from model_adapter import ModelAdapter
 
-X, y = load_diabetes(return_X_y=True, as_frame=True)
-scaler = StandardScaler()
-X_names = X.columns
+app = Flask(__name__)
+
+# Load and split the data
+X_train, X_test, y_train, y_test = load_and_preprocess_data()
+model = ModelAdapter()
+
+#model = IGANN(task='regression')
+model.fit(X_train, y_train)
 
 # Setup
 app = Flask(__name__)
-scaler = StandardScaler()
 
-# Load data
-X, y = load_diabetes(return_X_y=True, as_frame=True)
-X_names = X.columns
-X_scaled = scaler.fit_transform(X)
-X = pd.DataFrame(X_scaled, columns=X_names)
-X['sex'] = X.sex.apply(lambda x: 'w' if x > 0 else 'm')
-y = (y - y.mean()) / y.std()
-
-# Split dataset and create model
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-model = IGANN(task='regression')
-model.fit(X_train, y_train)
 
 # Initial data load
 shape_functions_dict = model.get_shape_functions_as_dict()
 feature_history = {feature['name']: [feature['y']] for feature in shape_functions_dict}
 feature_current_state = {feature['name']: feature['y'] for feature in shape_functions_dict}
+feature_spline_state = {feature['name']: feature['y'] for feature in shape_functions_dict}
 
 
 @app.route('/')
 def index():
     # Render with all features available to choose from
-    X_names_list = X_names.tolist()
-
+    X_names_list = X_train.columns.tolist()
     name_first_num, x_values_first_num, y_values_first_num = next(
         (feature['name'], feature['x'].astype(float).tolist(), feature['y'].astype(float).tolist())
         for feature in shape_functions_dict if feature['datatype'] == 'numerical'
@@ -146,30 +140,22 @@ def monotonic_decrease():
 def cubic_spline_interpolate():
     data = request.json
     selected_feature = data['selected_feature']  # Obtain the feature name from the request
-    # Ensure the feature's data is in the current state
-    if selected_feature not in feature_current_state:
-        # If not, use model's data
-        feature_data_dict = next(item for item in shape_functions_dict if item['name'] == selected_feature)
-        feature_current_state[selected_feature] = feature_data_dict['y']
 
-    # Access the specific feature's current y_data
-    y_data = feature_current_state[selected_feature]
-    x_data = next(item for item in shape_functions_dict if item['name'] == selected_feature)['x'].tolist()
+    # Access the original feature's x and y data from shape_functions_dict
+    feature_data_dict = next(item for item in shape_functions_dict if item['name'] == selected_feature)
+    x_data = feature_data_dict['x'].tolist()
+    original_y_data = feature_data_dict['y'].tolist()
 
-    #if selected_feature not in feature_history:
-    #    feature_history[selected_feature] = []
-
-    #feature_history[selected_feature].append(y_data.copy())
-
-
-    cs = CubicSpline(x_data, y_data)
-
-    #xnew = np.linspace(min(x_data), max(x_data), len(x_data) * 10)  # increase density of x for a smooth plot
+    # Perform cubic spline interpolation on the original y_data
+    cs = CubicSpline(x_data, original_y_data)
     ynew = cs(x_data)
 
-    #feature_current_state[selected_feature] = ynew.tolist()
+    # Update the feature_spline_state dictionary with the new spline data
+    feature_spline_state[selected_feature] = ynew.tolist()
 
+    # Return the interpolated data
     return jsonify({'x': x_data, 'y': ynew.tolist()})
+
 
 @app.route('/predict_and_get_mse', methods=['GET'])
 def predict_and_get_mse():
@@ -209,6 +195,30 @@ def undo_last_change():
         return jsonify({'error': 'No more changes to undo for feature ' + selected_feature}), 400
 
 
+@app.route('/update_model', methods=['POST'])
+def update_model():
+    data = request.json
+    print(data)
+    selected_feature = data['selected_feature']
+    #TODO: Möglichkeit auswählen können
+    method = "spline"
+    list_of_features = [selected_feature]
+    print(X_train.shape)
+    print(y_train.shape)
+    model.adapt(list_of_features, feature_spline_state, X_train, y_train, method="spline")
+    print(type(model))
+
+
+    y_train_pred = model.predict(X_train)
+    y_test_pred = model.predict(X_test)
+
+    mse_train = mean_squared_error(y_train, y_train_pred)
+    mse_test = mean_squared_error(y_test, y_test_pred)
+
+    print(mse_train)
+    print(mse_test)
+    # Return the MSE values as JSON
+    return jsonify({'mse_train': mse_train, 'mse_test': mse_test})
 
 
 if __name__ == '__main__':
