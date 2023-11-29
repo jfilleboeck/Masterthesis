@@ -8,6 +8,7 @@ class ModelAdapter():
     def __init__(self, model="IGANN"):
         self.model_name = model
         if self.model_name == "IGANN":
+            print("erfolgreich")
             self.model = IGANN(task='regression')
 
     def fit(self, X_train, y_train):
@@ -36,9 +37,17 @@ class IGANNAdapter(IGANN):
 
 
     def update_model_with_spline(self, selected_features, updated_data, X_train, y_train):
-        print("Ändert Modelle")
-        print(updated_data)
+        # set weights of selected features to 0
+        # add value from spline
+        #print(selected_features)
+        #print(updated_data)
         self.fit(X_train, y_train)
+        x_axis = self.get_shape_functions_as_dict()
+        print(type(x_axis))
+        print(x_axis)
+        print(x_axis[0])
+        #print(X_train["age"])
+
 
 
 

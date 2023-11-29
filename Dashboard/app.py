@@ -5,6 +5,7 @@ from sklearn.datasets import load_diabetes
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from igann import IGANN
+from scipy.interpolate import PchipInterpolator
 from sklearn.metrics import mean_squared_error
 from scipy.interpolate import CubicSpline
 
@@ -198,15 +199,12 @@ def undo_last_change():
 @app.route('/update_model', methods=['POST'])
 def update_model():
     data = request.json
-    print(data)
     selected_feature = data['selected_feature']
     #TODO: Möglichkeit auswählen können
     method = "spline"
     list_of_features = [selected_feature]
-    print(X_train.shape)
-    print(y_train.shape)
+
     model.adapt(list_of_features, feature_spline_state, X_train, y_train, method="spline")
-    print(type(model))
 
 
     y_train_pred = model.predict(X_train)
@@ -215,8 +213,6 @@ def update_model():
     mse_train = mean_squared_error(y_train, y_train_pred)
     mse_test = mean_squared_error(y_test, y_test_pred)
 
-    print(mse_train)
-    print(mse_test)
     # Return the MSE values as JSON
     return jsonify({'mse_train': mse_train, 'mse_test': mse_test})
 
