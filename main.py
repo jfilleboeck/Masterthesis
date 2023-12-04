@@ -41,10 +41,29 @@ for feature_name in features_to_update:
         feature_spline_state[feature_name] = np.full_like(feature_spline_state[feature_name], 0.05)
 
 
-updated_data = [feature_spline_state[feature] for feature in features_to_update if feature in feature_spline_state]
+updated_data = {feature: feature_spline_state[feature] for feature in features_to_update if feature in feature_spline_state}
 #cs = CubicSpline(feature_dict['x'], feature_spline_state[feature])
 #updated_data.append(cs)
+
+y_train_pred = model.predict(X_train)
+y_test_pred = model.predict(X_test)
+
+mse_train = mean_squared_error(y_train, y_train_pred)
+mse_test = mean_squared_error(y_test, y_test_pred)
+
+print(mse_train)
+print(mse_test)
+
 model = model.adapt(selected_features=features_to_update, updated_data=updated_data, X_train=X_train, y_train=y_train, method="spline")
 model.predict(X_test)
 #cs = CubicSpline(x, y)
 print(type(model))
+
+y_train_pred = model.predict(X_train)
+y_test_pred = model.predict(X_test)
+
+mse_train = mean_squared_error(y_train, y_train_pred)
+mse_test = mean_squared_error(y_test, y_test_pred)
+
+print(mse_train)
+print(mse_test)

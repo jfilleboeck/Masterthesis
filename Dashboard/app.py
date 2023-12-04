@@ -100,7 +100,7 @@ def monotonic_increase():
     end_index = find_nearest(x_data, x2)
 
     # Ensure increase is monotonic
-    for i in range(start_index, end_index + 1):  # Include end_index in the loop
+    for i in range(start_index + 1, end_index):  # Include end_index in the loop
         y_data[i] = max(y_data[i], y_data[i-1])
 
     feature_current_state[selected_feature] = y_data
@@ -176,7 +176,11 @@ def get_original_data():
     data = request.json
     selected_feature = data['selected_feature']
     #global x_data, y_data
-    data_dict = next(item for item in model.get_shape_functions_as_dict() if item['name'] == selected_feature)
+    shape_functions_dict = model.get_shape_functions_as_dict()
+    feature_history = {feature['name']: [feature['y']] for feature in shape_functions_dict}
+    feature_current_state = {feature['name']: feature['y'] for feature in shape_functions_dict}
+    feature_spline_state = {feature['name']: feature['y'] for feature in shape_functions_dict}
+    data_dict = next(item for item in shape_functions_dict if item['name'] == selected_feature)
     x_data = data_dict['x'].tolist()
     y_data = data_dict['y'].tolist()
     return jsonify({'x': x_data, 'y': y_data})
