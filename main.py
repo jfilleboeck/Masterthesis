@@ -38,7 +38,7 @@ features_to_update = ['age']
 for feature_name in features_to_update:
     if feature_name in feature_spline_state:
         # Hier müssen die Werte aus dem Frontend eingetragen werden
-        feature_spline_state[feature_name] = np.full_like(feature_spline_state[feature_name], 0.05)
+        feature_spline_state[feature_name] = np.full_like(feature_spline_state[feature_name], 0.35)
 
 
 updated_data = {feature: feature_spline_state[feature] for feature in features_to_update if feature in feature_spline_state}

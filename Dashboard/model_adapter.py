@@ -47,14 +47,19 @@ class IGANNAdapter(IGANN):
         if method=="spline":
             # create cubic spline
             spline_functions = {}
+            selected_features_i = []
+
             for feature in selected_features:
                 for feature_data in self.get_shape_functions_as_dict():
                     if feature_data['name'] == feature:
+                        feature_index = self.feature_names.index(feature)
                         x_data = feature_data['x']
                         y_data = updated_data[feature]  # New y data
                         spline = CubicSpline(x_data, y_data)
-                        spline_functions[feature] = spline
+                        spline_functions[feature_index] = spline
+                        selected_features_i.append(feature_index)
                         break
+
             # Copy ELM Regressor
             new_regressors = []
             # Create custom Regressor
@@ -68,7 +73,9 @@ class IGANNAdapter(IGANN):
                     elm_scale=regressor.elm_scale,
                     elm_alpha=regressor.elm_alpha,
                     act=regressor.act,
-                    device=regressor.device
+                    device=regressor.device,
+                    selected_features_i=selected_features_i,
+                    spline_functions=spline_functions
                 )
                 # Copying all attributes from the old regressor to the new regressor
                 for attr in vars(regressor):
@@ -79,6 +86,7 @@ class IGANNAdapter(IGANN):
             # Option 1: Adjust the predict function of the regressor
 
             # Option 2: Adjust the weights of the regressor
+
 
         if method=="optimize_weights":
             pass
@@ -101,9 +109,10 @@ class IGANNAdapter(IGANN):
 
 
 class ELM_Regressor_Spline(ELM_Regressor):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, selected_features_i, spline_functions, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self.selected_features_i = selected_features_i
+        self.spline_functions = spline_functions
 
     def predict(self, X, hidden=False):
         """
@@ -114,9 +123,17 @@ class ELM_Regressor_Spline(ELM_Regressor):
         else:
             X_hid = self.get_hidden_values(X)
 
-        # Now, we can use the values in the hidden layer to make the prediction with
-        # our ridge regression
+        # Set the coefficients for selected features to 0
+        for i in self.selected_features_i:
+            self.output_model.coef_[i * self.n_hid: (i + 1) * self.n_hid] = 0
+        # Use the modified coefficients for prediction
         out = X_hid @ self.output_model.coef_
+        # Add spline function values for selected features
+        for i in self.selected_features_i:
+            spline = self.spline_functions[i]
+            spline_values = spline(X[:, i])
+            out += spline_values
+
         return out
 
 
@@ -131,17 +148,24 @@ class ELM_Regressor_Spline(ELM_Regressor):
 
         # See self.predict for the description - it's almost equivalent.
         x_in = x.reshape(len(x), 1)
-        if i < self.n_numerical_cols:
-            # numerical feature
-            x_in = x_in @ self.hidden_mat[
-                i, i * self.n_hid : (i + 1) * self.n_hid
-            ].unsqueeze(0)
-            x_in = self.act(x_in)
-            out = x_in @ self.output_model.coef_[
-                i * self.n_hid : (i + 1) * self.n_hid
-            ].unsqueeze(1)
+        if i in self.selected_features_i:
+            # If the feature is selected, use the spline function for prediction
+            self.output_model.coef_[i * self.n_hid: (i + 1) * self.n_hid] = 0
+            spline = self.spline_functions[i]
+            out = spline(x)
         else:
-            # categorical feature
-            start_idx = self.n_numerical_cols * self.n_hid + (i - self.n_numerical_cols)
-            out = x_in @ self.output_model.coef_[start_idx : start_idx + 1].unsqueeze(1)
-        return out
+            if i < self.n_numerical_cols:
+                # numerical feature
+                x_in = x_in @ self.hidden_mat[
+                              i, i * self.n_hid: (i + 1) * self.n_hid
+                              ].unsqueeze(0)
+                x_in = self.act(x_in)
+                out = x_in @ self.output_model.coef_[
+                             i * self.n_hid: (i + 1) * self.n_hid
+                             ].unsqueeze(1)
+            else:
+                # categorical feature
+                start_idx = self.n_numerical_cols * self.n_hid + (i - self.n_numerical_cols)
+                out = x_in @ self.output_model.coef_[start_idx: start_idx + 1].unsqueeze(1)
+
+        return out.squeeze()
