@@ -12,7 +12,6 @@ from scipy.interpolate import CubicSpline
 from data_preprocessing import load_and_preprocess_data
 from model_adapter import ModelAdapter
 
-app = Flask(__name__)
 
 # Load and split the data
 X_train, X_test, y_train, y_test = load_and_preprocess_data()
@@ -27,9 +26,17 @@ app = Flask(__name__)
 
 # Initial data load
 shape_functions_dict = model.get_shape_functions_as_dict()
-feature_history = {feature['name']: [feature['y']] for feature in shape_functions_dict}
-feature_current_state = {feature['name']: feature['y'] for feature in shape_functions_dict}
-feature_spline_state = {feature['name']: feature['y'] for feature in shape_functions_dict}
+feature_history = {}
+feature_current_state = {}
+feature_spline_state = {}
+
+for feature in shape_functions_dict:
+    name = feature['name']
+    y_value = feature['y']
+
+    feature_history[name] = [y_value]
+    feature_current_state[name] = y_value
+    feature_spline_state[name] = y_value
 
 
 @app.route('/')
@@ -61,17 +68,17 @@ def setConstantValue():
     data = request.json
     selected_feature = data['selected_feature']
     x1, x2, new_y = data['x1'], data['x2'], float(data['new_y'])
-
-    y_data = feature_current_state[selected_feature]
+    #y_data = feature_current_state[selected_feature]
+    y_data = feature_current_state[selected_feature].copy()
     x_data = next(item for item in shape_functions_dict if item['name'] == selected_feature)['x'].tolist()
 
-    history_entry = y_data.copy()
+    #history_entry = y_data.copy()
     for i, x in enumerate(x_data):
         if x1 <= x <= x2:
             y_data[i] = new_y
 
     # Append the history entry after making changes
-    feature_history[selected_feature].append(history_entry)
+    feature_history[selected_feature].append(feature_current_state[selected_feature])
 
     # Save the modified state back to the feature_current_state dictionary
     feature_current_state[selected_feature] = y_data
@@ -90,10 +97,12 @@ def monotonic_increase():
     data = request.json
     selected_feature = data['selected_feature']
 
-    y_data = feature_current_state[selected_feature]
+    y_data = feature_current_state[selected_feature].copy()
     x_data = next(item for item in shape_functions_dict if item['name'] == selected_feature)['x'].tolist()
 
-    feature_history[selected_feature].append(y_data.copy())
+    #feature_history[selected_feature].append(y_data.copy())
+    feature_history[selected_feature].append(feature_current_state[selected_feature])
+
 
     x1, x2 = data['x1'], data['x2']
     start_index = max(find_nearest(x_data, x1), 1)  # Ensure start_index is greater than 0
@@ -113,11 +122,11 @@ def monotonic_decrease():
     data = request.json
     selected_feature = data['selected_feature']  # Obtain the feature_name from the request
 
-    y_data = feature_current_state[selected_feature]
+    y_data = feature_current_state[selected_feature].copy()
     x_data = next(item for item in shape_functions_dict if item['name'] == selected_feature)['x'].tolist()
 
     # Record current state before making changes
-    feature_history[selected_feature].append(y_data.copy())
+    feature_history[selected_feature].append(feature_current_state[selected_feature])
 
     # Get start and end index for the selected x range
     x1, x2 = data['x1'], data['x2']
@@ -173,31 +182,41 @@ def predict_and_get_mse():
 
 @app.route('/get_original_data', methods=['POST'])
 def get_original_data():
+    global feature_history, feature_current_state, feature_spline_state
+
     data = request.json
     selected_feature = data['selected_feature']
-    #global x_data, y_data
-    shape_functions_dict = model.get_shape_functions_as_dict()
-    feature_history = {feature['name']: [feature['y']] for feature in shape_functions_dict}
-    feature_current_state = {feature['name']: feature['y'] for feature in shape_functions_dict}
-    feature_spline_state = {feature['name']: feature['y'] for feature in shape_functions_dict}
-    data_dict = next(item for item in shape_functions_dict if item['name'] == selected_feature)
-    x_data = data_dict['x'].tolist()
-    y_data = data_dict['y'].tolist()
+
+    # Obtain the original data for the selected feature
+    original_data = next(item for item in model.get_shape_functions_as_dict() if item['name'] == selected_feature)
+    original_y = original_data['y']
+
+    # Reset the current state and history for the selected feature
+    feature_current_state[selected_feature] = original_y
+    feature_history[selected_feature] = [original_y.copy()]  # Reset history with the original state
+
+    # Resetting feature_spline_state if necessary
+    feature_spline_state[selected_feature] = original_y
+
+    # Prepare data for response
+    x_data = original_data['x'].tolist()
+    y_data = original_y.tolist()
+
     return jsonify({'x': x_data, 'y': y_data})
+
 
 @app.route('/undo_last_change', methods=['POST'])
 def undo_last_change():
     data = request.json
-    print(data)
     selected_feature = data['selected_feature']
 
     if selected_feature in feature_history and len(feature_history[selected_feature]) > 1:
-        feature_history[selected_feature].pop()  # Remove the last change
-        feature_current_state[selected_feature] = feature_history[selected_feature][-1]  # Revert to the previous state
+        feature_current_state[selected_feature] = feature_history[selected_feature].pop()  # Revert to the previous state and remove the last change
         y_data = feature_current_state[selected_feature]  # Update y_data to the reverted state
         return jsonify({'y': y_data.tolist()})
     else:
         return jsonify({'error': 'No more changes to undo for feature ' + selected_feature}), 400
+
 
 
 @app.route('/update_model', methods=['POST'])
