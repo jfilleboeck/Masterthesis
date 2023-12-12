@@ -24,20 +24,23 @@ model.fit(X_train, y_train)
 app = Flask(__name__)
 
 
+
+def load_data():
+    global shape_functions_dict, feature_history, feature_current_state, feature_spline_state
+    shape_functions_dict = model.get_shape_functions_as_dict()
+    feature_history = {}
+    feature_current_state = {}
+    feature_spline_state = {}
+
+    for feature in shape_functions_dict:
+        name = feature['name']
+        y_value = feature['y']
+
+        feature_history[name] = [y_value]
+        feature_current_state[name] = y_value
+        feature_spline_state[name] = y_value
 # Initial data load
-shape_functions_dict = model.get_shape_functions_as_dict()
-feature_history = {}
-feature_current_state = {}
-feature_spline_state = {}
-
-for feature in shape_functions_dict:
-    name = feature['name']
-    y_value = feature['y']
-
-    feature_history[name] = [y_value]
-    feature_current_state[name] = y_value
-    feature_spline_state[name] = y_value
-
+load_data()
 
 @app.route('/')
 def index():

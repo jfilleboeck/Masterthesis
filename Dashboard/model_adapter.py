@@ -25,6 +25,26 @@ class ModelAdapter():
             self.model.update_model(selected_features, updated_data, method, X_train, y_train)
         return self.model
 
+    def plot_single(self, plot_by_list):
+        # Check if the underlying model has 'plot_single' method
+        if hasattr(self.model, 'plot_single'):
+            return self.model.plot_single(plot_by_list)
+        else:
+            raise NotImplementedError("Plotting is not supported for this model.")
+
+    @property
+    def unique(self):
+        if self.model_name == "IGANN" and hasattr(self.model, 'unique'):
+            return self.model.unique
+        else:
+            raise AttributeError("Unique attribute not available for this model")
+
+    @property
+    def feature_names(self):
+        if self.model_name == "IGANN" and hasattr(self.model, 'feature_names'):
+            return self.model.feature_names
+        else:
+            raise AttributeError("Feature names attribute not available for this model")
 
     def get_shape_functions_as_dict(self):
         if self.model_name == "IGANN":
@@ -88,24 +108,50 @@ class IGANNAdapter(IGANN):
             # Option 2: Adjust the weights of the regressor
 
 
-        if method=="optimize_weights":
-            pass
+        if method=="reoptimize_weights":
+            # Fit the model with adjusted regressors
+            # y muss angepasst werden. Wenn in selected features, dann updated_data, sonst nicht
+            # y_hat überprüfen
 
-            # fit the model with adjusted regressors
+            #X_val, y_val, y_hat_val
+
+            for feature in selected_features:
+                print(feature)
+                x = X_train[feature]
+                y_hat = self.init_classifier.coef_[self.feature_names.index(feature)] * x + self.init_classifier.intercept_
+                #y = training targets, adjusted for certain x values
+                y = updated_data[feature]
+                hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
+                y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(
+                    y, y_hat
+                )
+                # y_val? Habe ich nicht
+                print(y_tilde)
+                for regressor in self.regressors:
+                    print(regressor)
 
         #print(X_train["age"])
 
-    def replace_shape_curve(self, feature_name, new_x, new_y):
-        # Implementation for replacing shape curve
-        pass
+    def predict_raw(self, X):
+        """
+        This function returns a prediction for a given feature matrix X.
+        Note: for a classification task, it returns the raw logit values.
+        """
+        X = self._preprocess_feature_matrix(X, fit_dummies=False).to(self.device)
+        X = X[:, self.feature_indizes]
 
-    def nullify_regressor(self, feature_name):
-        # Implementation to nullify a regressor
-        pass
+        self.pred_nn = torch.zeros(len(X), dtype=torch.float32).to(self.device)
+        for boost_rate, regressor in zip(self.boosting_rates, self.regressors):
+                self.pred_nn += boost_rate * regressor.predict(X).squeeze()
+        self.pred_nn = self.pred_nn.detach().cpu().numpy()
+        X = X.detach().cpu().numpy()
+        pred = (
+            self.pred_nn
+            + (self.init_classifier.coef_.astype(np.float32) @ X.transpose()).squeeze()
+            + self.init_classifier.intercept_
+        )
 
-    def _add_function(self, function_name):
-        # Implementation to add a new function
-        pass
+        return pred
 
 
 class ELM_Regressor_Spline(ELM_Regressor):
@@ -134,6 +180,9 @@ class ELM_Regressor_Spline(ELM_Regressor):
             spline_values = spline(X[:, i])
             out += spline_values
 
+        if isinstance(spline_values, np.ndarray):
+            spline_values = torch.from_numpy(spline_values).float()
+
         return out
 
 
@@ -153,6 +202,9 @@ class ELM_Regressor_Spline(ELM_Regressor):
             self.output_model.coef_[i * self.n_hid: (i + 1) * self.n_hid] = 0
             spline = self.spline_functions[i]
             out = spline(x)
+
+            if isinstance(out, np.ndarray):
+                out = torch.from_numpy(out).float()
         else:
             if i < self.n_numerical_cols:
                 # numerical feature
