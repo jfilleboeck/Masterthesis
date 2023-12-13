@@ -13,7 +13,6 @@ class ModelAdapter():
     def __init__(self, model="IGANN"):
         self.model_name = model
         if self.model_name == "IGANN":
-            print("erfolgreich")
             self.model = IGANN(task='regression')
 
     def fit(self, X_train, y_train):
@@ -22,7 +21,11 @@ class ModelAdapter():
     def adapt(self,  selected_features, updated_data, method, X_train, y_train):
         if self.model_name == "IGANN":
             self.model = IGANNAdapter(task='regression')
-            self.model.update_model(selected_features, updated_data, method, X_train, y_train)
+            if method == "reoptimize_weights":
+                self.model.reoptimize_weights(selected_features, updated_data, X_train, y_train)
+            if method == "spline":
+                self.model.update_model(selected_features, updated_data, X_train, y_train)
+
         return self.model
 
     def plot_single(self, plot_by_list):
@@ -59,130 +62,97 @@ class IGANNAdapter(IGANN):
     def __init__(self, *args, **kwargs):
         super(IGANNAdapter, self).__init__(*args, **kwargs)
 
-
-    def update_model(self, selected_features, updated_data, method, X_train, y_train):
+    def reoptimize_weights(self, selected_feature, updated_data, X_train, y_train):
         # set weights of selected features to 0
         self.fit(X_train, y_train)
-        # add value from spline
-        if method=="spline":
-            # create cubic spline
-            spline_functions = {}
-            selected_features_i = []
+        # Fit the model with adjusted regressors
+        i = self.feature_names.index(selected_feature)
+        shape_information = next(item for item in self.get_shape_functions_as_dict() if item['name'] == selected_feature)
+        x = torch.tensor(shape_information['x'], dtype=torch.float32)
+        y_hat = self.init_classifier.coef_[i] * x.numpy() + self.init_classifier.intercept_
+        # y = training targets, adjusted for certain x values
+        y = torch.tensor(updated_data, dtype=torch.float32) - y_hat
+        # TODO: Y_VAL ?
+        for counter, regressor in enumerate(self.regressors):
+            hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
+            y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(
+                y, y_hat
+            )
+            new_regressor = ELM_Regressor(
+                n_input=1,
+                # TODO: Für kategorische Werte, muss n.categorical_cols angepasst werden
+                n_categorical_cols=0,
+                n_hid=self.n_hid,
+                seed=counter,
+                elm_scale=self.elm_scale,
+                elm_alpha=self.elm_alpha,
+                act=self.act,
+                device=self.device,
+            )
 
-            for feature in selected_features:
-                for feature_data in self.get_shape_functions_as_dict():
-                    if feature_data['name'] == feature:
-                        feature_index = self.feature_names.index(feature)
-                        x_data = feature_data['x']
-                        y_data = updated_data[feature]  # New y data
-                        spline = CubicSpline(x_data, y_data)
-                        spline_functions[feature_index] = spline
-                        selected_features_i.append(feature_index)
-                        break
+            X_hid = new_regressor.fit(
+                x.reshape(-1, 1),
+                y_tilde,
+                torch.sqrt(torch.tensor(0.5).to(self.device))
+                * self.boost_rate
+                * hessian_train_sqrt[:, None],
+            )
+            # Make a prediction of the ELM for the update of y_hat
+            train_regressor_pred = new_regressor.predict(X_hid, hidden=True).squeeze()
 
-            # Copy ELM Regressor
-            new_regressors = []
-            # Create custom Regressor
-            for index, regressor in enumerate(self.regressors):
-                new_regressor=ELM_Regressor_Spline(
-                    n_input=regressor.n_input,
-                    n_categorical_cols=regressor.n_categorical_cols,
-                    n_hid=regressor.n_hid,
-                    # seed is not an instance attribute in IGANN code
-                    seed=getattr(regressor, 'seed', 0),
-                    elm_scale=regressor.elm_scale,
-                    elm_alpha=regressor.elm_alpha,
-                    act=regressor.act,
-                    device=regressor.device,
-                    selected_features_i=selected_features_i,
-                    spline_functions=spline_functions
-                )
-                # Copying all attributes from the old regressor to the new regressor
-                for attr in vars(regressor):
-                    setattr(new_regressor, attr, getattr(regressor, attr))
-                new_regressor.spline_functions = spline_functions
-                new_regressors.append(new_regressor)
-            self.regressors = new_regressors
-            # Option 1: Adjust the predict function of the regressor
+            # Update the prediction for training and validation data
+            y_hat = torch.tensor(y_hat, dtype=torch.float32)
+            y_hat += self.boost_rate * train_regressor_pred
 
-            # Option 2: Adjust the weights of the regressor
+            y_hat = self._clip_p(y_hat)
+            # TODO: Ergebnisse in Listen aktualisieren
+            print(i)
+            print(self.n_hid)
+            regressor.hidden_mat[i, i * self.n_hid: (i + 1) * self.n_hid] = new_regressor.hidden_mat.squeeze()
+            regressor.output_model.coef_[i * self.n_hid: (i + 1) * self.n_hid] = new_regressor.output_model.coef_
 
+    def update_model_with_spline(self, selected_features, updated_data, X_train, y_train):
+        self.fit(X_train, y_train)
+        # create cubic spline
+        spline_functions = {}
+        selected_features_i = []
 
-        if method=="reoptimize_weights":
-            # Fit the model with adjusted regressors
-            # y muss angepasst werden. Wenn in selected features, dann updated_data, sonst nicht
-            # y_hat überprüfen
+        for feature in selected_features:
+            for feature_data in self.get_shape_functions_as_dict():
+                if feature_data['name'] == feature:
+                    feature_index = self.feature_names.index(feature)
+                    x_data = feature_data['x']
+                    y_data = updated_data[feature]  # New y data
+                    spline = CubicSpline(x_data, y_data)
+                    spline_functions[feature_index] = spline
+                    selected_features_i.append(feature_index)
+                    break
 
-            #X_val, y_val, y_hat_val
-
-            for feature in selected_features:
-                print(feature)
-                i = self.feature_names.index(feature)
-                dict_data = next(item for item in self.get_shape_functions_as_dict() if item['name'] == 's1')
-                x = torch.tensor(dict_data['x'], dtype=torch.float32)
-                #x = X_train[feature]
-                y_hat = self.init_classifier.coef_[i] * x.numpy() + self.init_classifier.intercept_
-                #y = training targets, adjusted for certain x values
-                y = torch.tensor(updated_data[feature], dtype=torch.float32)
-                # y_val? Habe ich nicht
-                for counter, regressor in enumerate(self.regressors):
-                    hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
-                    y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(
-                        y, y_hat
-                    )
-                    new_regressor = ELM_Regressor(
-                        n_input=1,
-                        # TODO: Für kategorische Werte, muss n.categorical_cols angepasst werden
-                        n_categorical_cols=0,
-                        n_hid=self.n_hid,
-                        seed=counter,
-                        elm_scale=self.elm_scale,
-                        elm_alpha=self.elm_alpha,
-                        act=self.act,
-                        device=self.device,
-                    )
-
-                    X_hid = new_regressor.fit(
-                        x.reshape(-1, 1),
-                        y_tilde,
-                        torch.sqrt(torch.tensor(0.5).to(self.device))
-                        * self.boost_rate
-                        * hessian_train_sqrt[:, None],
-                    )
-                    # Make a prediction of the ELM for the update of y_hat
-                    train_regressor_pred = new_regressor.predict(X_hid, hidden=True).squeeze()
-
-                    # Update the prediction for training and validation data
-                    y_hat = torch.tensor(y_hat, dtype=torch.float32)
-                    y_hat += self.boost_rate * train_regressor_pred
-
-                    y_hat = self._clip_p(y_hat)
+        # Copy ELM Regressor
+        new_regressors = []
+        # Create custom Regressor
+        for index, regressor in enumerate(self.regressors):
+            new_regressor=ELM_Regressor_Spline(
+                n_input=regressor.n_input,
+                n_categorical_cols=regressor.n_categorical_cols,
+                n_hid=regressor.n_hid,
+                # seed is not an instance attribute in IGANN code
+                seed=getattr(regressor, 'seed', 0),
+                elm_scale=regressor.elm_scale,
+                elm_alpha=regressor.elm_alpha,
+                act=regressor.act,
+                device=regressor.device,
+                selected_features_i=selected_features_i,
+                spline_functions=spline_functions
+            )
+            # Copying all attributes from the old regressor to the new regressor
+            for attr in vars(regressor):
+                setattr(new_regressor, attr, getattr(regressor, attr))
+            new_regressor.spline_functions = spline_functions
+            new_regressors.append(new_regressor)
+        self.regressors = new_regressors
 
 
-                    regressor.hidden_mat[i, i * self.n_hid: (i + 1) * self.n_hid] = new_regressor.hidden_mat.squeeze()
-                    regressor.output_model.coef_[i * self.n_hid : (i + 1) * self.n_hid] = new_regressor.output_model.coef_
-
-
-    def predict_raw(self, X):
-        """
-        This function returns a prediction for a given feature matrix X.
-        Note: for a classification task, it returns the raw logit values.
-        """
-        X = self._preprocess_feature_matrix(X, fit_dummies=False).to(self.device)
-        X = X[:, self.feature_indizes]
-
-        self.pred_nn = torch.zeros(len(X), dtype=torch.float32).to(self.device)
-        for boost_rate, regressor in zip(self.boosting_rates, self.regressors):
-                self.pred_nn += boost_rate * regressor.predict(X).squeeze()
-        self.pred_nn = self.pred_nn.detach().cpu().numpy()
-        X = X.detach().cpu().numpy()
-        pred = (
-            self.pred_nn
-            + (self.init_classifier.coef_.astype(np.float32) @ X.transpose()).squeeze()
-            + self.init_classifier.intercept_
-        )
-
-        return pred
 
 
 class ELM_Regressor_Spline(ELM_Regressor):

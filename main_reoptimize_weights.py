@@ -40,7 +40,6 @@ feature_current_state = {feature['name']: feature['y'] for feature in shape_func
 #feature_spline_state = {feature['name']: feature['y'] for feature in shape_functions_dict}
 
 
-
 # List of features to update
 features_to_update = ['s1']
 

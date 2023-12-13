@@ -30,28 +30,32 @@
     </select>
     <div id="plot"></div>
 <div class="control-panel mt-4">
-    <form class="form-inline">
-        <label for="x1-value" class="mr-2">x1:</label>
-        <input type="number" class="form-control mr-2" style="width: 100px;" id="x1-value">
-
-        <label for="x2-value" class="mr-2">x2:</label>
-        <input type="number" class="form-control mr-2" style="width: 100px;" id="x2-value">
-
-        <label for="new-y-value" class="mr-2">New y-value:</label>
-        <input type="number" class="form-control mr-2" style="width: 120px;" id="new-y-value">
-
+    <p style="margin-bottom: 10px;"><b>Adjust the shape function:</b></p>
+    <form class="form-inline" style="margin-bottom: 20px;">
+        <input type="number" class="form-control mr-2" style="width: 70px;" id="x1-value" placeholder="x1">
+        <input type="number" class="form-control mr-2" style="width: 70px;" id="x2-value" placeholder="x2">
+        <input type="number" class="form-control mr-2" style="width: 130px;" id="new-y-value" placeholder="new y-value">
         <button class="btn btn-primary mr-2" onclick="setConstantValue(); return false;">Set Constant Value</button>
+        <button class="btn btn-primary mr-2" onclick="setlinear(); return false;">Set Linear</button>
         <button class="btn btn-info mr-2" onclick="setMonotonicIncrease(); return false;">Monotonic Increase</button>
         <button class="btn btn-info mr-2" onclick="setMonotonicDecrease(); return false;">Monotonic Decrease</button>
-        <button class="btn btn-secondary mr-2" onclick="resetGraph(); return false;">Reset</button>
-        <button class="btn btn-danger" onclick="undoLastChange(); return false;">Undo</button>
-
+    </form>
+    <p style="margin-bottom: 10px;"><b>Incorporate into model and predict:</b></p>
+    <form class="form-inline">
         <button class="btn btn-success mr-2" onclick="predictAndGetMSE(); return false;">Get MSE</button>
-        <div id="mse-output" class="alert alert-info">Calculating MSE...</div>
+        <div id="mse-output" class="btn btn-success mr-2" style="margin-right: 8px";>Calculating MSE...</div>
         <button class="btn btn-info mr-2" onclick="performCubicSplineInterpolation(); return false;">Cubic Spline Interpolation</button>
-        <btton class="btn btn-info mr-2" onclick="updateModel(); return false;">Update Model</btton>
+        <button class="btn btn-info mr-2" onclick="updateModel(); return false;">Update Model (Splines)</button>
+        <button class="btn btn-info mr-2" onclick="updateWeights(); return false;">Update Model (Weights)</button>
+    </form>
+    <p style="margin-bottom: 10px;"><b>Restore:</b></p>
+    <form class="form-inline" style="margin-bottom: 20px;">
+        <button class="btn btn-danger" style="margin-right: 8px" onclick="resetGraph(); return false;">Reset</button>
+        <button class="btn btn-secondary mr-2" onclick="undoLastChange(); return false;">Undo</button>
     </form>
 </div>
+
+
 
     <script>
         // Variables for creating the plot
@@ -205,11 +209,24 @@
                     Plotly.addTraces('plot', newTrace);
                 }
             })
-            .catch(error => {
-                console.error('An error occurred:', error);
-                alert('An error occurred: ' + error.message);
+        }
+
+        function updateWeights() {
+            const selectedFeature = document.getElementById('feature-select').value;
+            console.log("that worked")
+            fetch('/update_weights', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({selected_feature: selectedFeature})
+            })
+            .then(response => response.json())
+            .then(data => {
+                Plotly.update('plot', {y: [data.y]});
             });
         }
+
 
         function predictAndGetMSE() {
             fetch('/predict_and_get_mse')
