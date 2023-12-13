@@ -117,20 +117,51 @@ class IGANNAdapter(IGANN):
 
             for feature in selected_features:
                 print(feature)
-                x = X_train[feature]
-                y_hat = self.init_classifier.coef_[self.feature_names.index(feature)] * x + self.init_classifier.intercept_
+                i = self.feature_names.index(feature)
+                dict_data = next(item for item in self.get_shape_functions_as_dict() if item['name'] == 's1')
+                x = torch.tensor(dict_data['x'], dtype=torch.float32)
+                #x = X_train[feature]
+                y_hat = self.init_classifier.coef_[i] * x.numpy() + self.init_classifier.intercept_
                 #y = training targets, adjusted for certain x values
-                y = updated_data[feature]
-                hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
-                y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(
-                    y, y_hat
-                )
+                y = torch.tensor(updated_data[feature], dtype=torch.float32)
                 # y_val? Habe ich nicht
-                print(y_tilde)
-                for regressor in self.regressors:
-                    print(regressor)
+                for counter, regressor in enumerate(self.regressors):
+                    hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
+                    y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(
+                        y, y_hat
+                    )
+                    new_regressor = ELM_Regressor(
+                        n_input=1,
+                        # TODO: Für kategorische Werte, muss n.categorical_cols angepasst werden
+                        n_categorical_cols=0,
+                        n_hid=self.n_hid,
+                        seed=counter,
+                        elm_scale=self.elm_scale,
+                        elm_alpha=self.elm_alpha,
+                        act=self.act,
+                        device=self.device,
+                    )
 
-        #print(X_train["age"])
+                    X_hid = new_regressor.fit(
+                        x.reshape(-1, 1),
+                        y_tilde,
+                        torch.sqrt(torch.tensor(0.5).to(self.device))
+                        * self.boost_rate
+                        * hessian_train_sqrt[:, None],
+                    )
+                    # Make a prediction of the ELM for the update of y_hat
+                    train_regressor_pred = new_regressor.predict(X_hid, hidden=True).squeeze()
+
+                    # Update the prediction for training and validation data
+                    y_hat = torch.tensor(y_hat, dtype=torch.float32)
+                    y_hat += self.boost_rate * train_regressor_pred
+
+                    y_hat = self._clip_p(y_hat)
+
+
+                    regressor.hidden_mat[i, i * self.n_hid: (i + 1) * self.n_hid] = new_regressor.hidden_mat.squeeze()
+                    regressor.output_model.coef_[i * self.n_hid : (i + 1) * self.n_hid] = new_regressor.output_model.coef_
+
 
     def predict_raw(self, X):
         """

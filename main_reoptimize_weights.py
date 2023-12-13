@@ -45,10 +45,12 @@ feature_current_state = {feature['name']: feature['y'] for feature in shape_func
 features_to_update = ['s1']
 
 # Get index of s1
-s1_index = model.feature_names.index('s1')
+#s1_index = model.feature_names.index('s1')
 
 # parabola values
-x = model.unique[s1_index]
+dict_data = next(item for item in model.get_shape_functions_as_dict() if item['name'] == 's1')
+x = dict_data['x']
+#x = model.unique[s1_index]
 a, b, c = 0.05, 0, 0
 y = a * x**2 + b * x + c
 
