@@ -106,8 +106,7 @@ class IGANNAdapter(IGANN):
 
             y_hat = self._clip_p(y_hat)
             # TODO: Ergebnisse in Listen aktualisieren
-            print(i)
-            print(self.n_hid)
+            # replace the weights in the list of original regressors
             regressor.hidden_mat[i, i * self.n_hid: (i + 1) * self.n_hid] = new_regressor.hidden_mat.squeeze()
             regressor.output_model.coef_[i * self.n_hid: (i + 1) * self.n_hid] = new_regressor.output_model.coef_
 
