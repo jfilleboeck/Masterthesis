@@ -24,7 +24,7 @@ class ModelAdapter():
             if method == "reoptimize_weights":
                 self.model.reoptimize_weights(selected_features, updated_data, X_train, y_train)
             if method == "spline":
-                self.model.update_model(selected_features, updated_data, X_train, y_train)
+                self.model.update_model_with_spline(selected_features, updated_data, X_train, y_train)
 
         return self.model
 
@@ -63,9 +63,7 @@ class IGANNAdapter(IGANN):
         super(IGANNAdapter, self).__init__(*args, **kwargs)
 
     def reoptimize_weights(self, selected_feature, updated_data, X_train, y_train):
-        # set weights of selected features to 0
         self.fit(X_train, y_train)
-        # Fit the model with adjusted regressors
         i = self.feature_names.index(selected_feature)
         shape_information = next(item for item in self.get_shape_functions_as_dict() if item['name'] == selected_feature)
         x = torch.tensor(shape_information['x'], dtype=torch.float32)
@@ -75,9 +73,7 @@ class IGANNAdapter(IGANN):
         # TODO: Y_VAL ?
         for counter, regressor in enumerate(self.regressors):
             hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
-            y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(
-                y, y_hat
-            )
+            y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat)
             new_regressor = ELM_Regressor(
                 n_input=1,
                 # TODO: Für kategorische Werte, muss n.categorical_cols angepasst werden
@@ -89,7 +85,6 @@ class IGANNAdapter(IGANN):
                 act=self.act,
                 device=self.device,
             )
-
             X_hid = new_regressor.fit(
                 x.reshape(-1, 1),
                 y_tilde,
@@ -99,11 +94,9 @@ class IGANNAdapter(IGANN):
             )
             # Make a prediction of the ELM for the update of y_hat
             train_regressor_pred = new_regressor.predict(X_hid, hidden=True).squeeze()
-
             # Update the prediction for training and validation data
             y_hat = torch.tensor(y_hat, dtype=torch.float32)
             y_hat += self.boost_rate * train_regressor_pred
-
             y_hat = self._clip_p(y_hat)
             # TODO: Ergebnisse in Listen aktualisieren
             # replace the weights in the list of original regressors
@@ -179,10 +172,6 @@ class ELM_Regressor_Spline(ELM_Regressor):
             spline = self.spline_functions[i]
             spline_values = spline(X[:, i])
             out += spline_values
-
-        if isinstance(spline_values, np.ndarray):
-            spline_values = torch.from_numpy(spline_values).float()
-
         return out
 
 
@@ -198,13 +187,23 @@ class ELM_Regressor_Spline(ELM_Regressor):
         # See self.predict for the description - it's almost equivalent.
         x_in = x.reshape(len(x), 1)
         if i in self.selected_features_i:
-            # If the feature is selected, use the spline function for prediction
-            self.output_model.coef_[i * self.n_hid: (i + 1) * self.n_hid] = 0
-            spline = self.spline_functions[i]
-            out = spline(x)
+            if i < self.n_numerical_cols:
+                # If the feature is selected, use the spline function for prediction
+                self.output_model.coef_[i * self.n_hid: (i + 1) * self.n_hid] = 0
+                x_in = x_in @ self.hidden_mat[
+                              i, i * self.n_hid: (i + 1) * self.n_hid
+                              ].unsqueeze(0)
+                x_in = self.act(x_in)
+                out = x_in @ self.output_model.coef_[
+                             i * self.n_hid: (i + 1) * self.n_hid
+                             ].unsqueeze(1)
+                spline = self.spline_functions[i]
+                out += spline(x)
 
-            if isinstance(out, np.ndarray):
-                out = torch.from_numpy(out).float()
+
+
+                if isinstance(out, np.ndarray):
+                    out = torch.from_numpy(out).float()
         else:
             if i < self.n_numerical_cols:
                 # numerical feature

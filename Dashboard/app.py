@@ -156,10 +156,10 @@ def cubic_spline_interpolate():
 
     feature_data_dict = next(item for item in shape_functions_dict if item['name'] == selected_feature)
     x_data = feature_data_dict['x'].tolist()
-    original_y_data = feature_data_dict['y'].tolist()
+    y_data = feature_current_state[selected_feature].tolist()
 
 
-    cs = CubicSpline(x_data, original_y_data)
+    cs = CubicSpline(x_data, y_data)
     ynew = cs(x_data)
 
 

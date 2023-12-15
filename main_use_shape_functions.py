@@ -1,96 +1,62 @@
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
-
+import os
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from sklearn.datasets import load_diabetes
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from igann import IGANN
 from sklearn.metrics import mean_squared_error
-from scipy.interpolate import CubicSpline
-
 from Dashboard.data_preprocessing import load_and_preprocess_data
 from Dashboard.model_adapter import ModelAdapter
-
-import warnings
-
-
 
 if __name__ == "__main__":
     print("Running main script")
 
-# Load and split the data
-X_train, X_test, y_train, y_test = load_and_preprocess_data()
-model = ModelAdapter()
+    # Load and split the data
+    X_train, X_test, y_train, y_test = load_and_preprocess_data()
+    model = ModelAdapter()
+    model.fit(X_train, y_train)
 
-#print(type(X_train))
-#print(X_train['s1'])
+    # Create a directory for plots
+    plot_dir = "feature_plots_shape"
+    if not os.path.exists(plot_dir):
+        os.makedirs(plot_dir)
 
-#model = IGANN(task='regression')
-model.fit(X_train, y_train)
-model.plot_single(plot_by_list=['age', 'bmi', 'bp', 's1', 's2'])
+    # List of features to iterate
+    features_to_change = ['age', 'bmi', 'bp', 's1', 's2']
+    selected_features = []
+    updated_data = {}
+    for feature_to_change in features_to_change:
 
+        # Get the feature data
+        dict_data = next(item for item in model.get_shape_functions_as_dict() if item['name'] == feature_to_change)
+        x = dict_data['x']
+        y_data = dict_data['y']
+        y = [0 if x < 0 else x for x in y_data]
 
-# Initial data load
-shape_functions_dict = model.get_shape_functions_as_dict()
-feature_history = {feature['name']: [feature['y']] for feature in shape_functions_dict}
-feature_current_state = {feature['name']: feature['y'] for feature in shape_functions_dict}
-#feature_spline_state = {feature['name']: feature['y'] for feature in shape_functions_dict}
+        selected_features.append(feature_to_change)
+        updated_data[feature_to_change] = y
+        # Plot and save the parabola
+        plt.figure(figsize=(8, 6))
+        plt.plot(x, y, label=f'y = {feature_to_change}')
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.title(f'Plot of {feature_to_change}')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(os.path.join(plot_dir, f"{feature_to_change}_parabola.png"))
+        plt.close()
 
-feature_to_change = 's2'
+        # Update and re-optimize the model
+        model = ModelAdapter()
+        model.fit(X_train, y_train)
+        model = model.adapt(selected_features=selected_features, updated_data=updated_data, X_train=X_train, y_train=y_train, method="spline")
 
-# List of features to update
-features_to_update = [feature_to_change]
+        # Plot and save the model's new predictions
+        model.plot_single(plot_by_list=['age', 'bmi', 'bp', 's1', 's2'])
+        plt.savefig(os.path.join(plot_dir, f"{feature_to_change}_model_plot.png"))
+        plt.close()
 
-# Get index of s1
-#s1_index = model.feature_names.index('s1')
-
-# parabola values
-dict_data = next(item for item in model.get_shape_functions_as_dict() if item['name'] == feature_to_change)
-x = dict_data['x']
-y_data = dict_data['y']
-y = [0 if x < 0 else x for x in y_data]
-#x = model.unique[s1_index]
-a, b, c = 0.05, 0, 0
-#y = a * x**2 + b * x + c
-
-
-
-plt.figure(figsize=(8, 6))
-plt.plot(x, y, label='y = 0.05x^2')
-plt.xlabel('x')
-plt.ylabel('y')
-plt.title('Plot of the Parabola y = 0.05x^2')
-plt.legend()
-plt.grid(True)
-plt.show()
-
-
-updated_data = {feature_to_change: y}
-
-
-
-y_train_pred = model.predict(X_train)
-y_test_pred = model.predict(X_test)
-
-mse_train = mean_squared_error(y_train, y_train_pred)
-mse_test = mean_squared_error(y_test, y_test_pred)
-
-print(mse_train)
-print(mse_test)
-
-model = model.adapt(selected_features=feature_to_change, updated_data=y, X_train=X_train, y_train=y_train, method="reoptimize_weights")
-model.predict(X_test)
-
-y_train_pred = model.predict(X_train)
-y_test_pred = model.predict(X_test)
-
-mse_train = mean_squared_error(y_train, y_train_pred)
-mse_test = mean_squared_error(y_test, y_test_pred)
-
-print(mse_train)
-print(mse_test)
-
-model.plot_single(plot_by_list=['age', 'bmi', 'bp', 's1', 's2'])
+        # Calculate and print mean squared error
+        y_train_pred = model.predict(X_train)
+        y_test_pred = model.predict(X_test)
+        mse_train = mean_squared_error(y_train, y_train_pred)
+        mse_test = mean_squared_error(y_test, y_test_pred)
+        print(f"{feature_to_change} - MSE Train: {mse_train}, MSE Test: {mse_test}")
