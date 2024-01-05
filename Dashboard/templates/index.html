@@ -71,7 +71,7 @@
             autosize: true,
             responsive: true
         };
-        let isNumericFeature = true; // Global variable to track feature type
+        let isNumericFeature = {{ is_numeric_feature|tojson }}; // Global variable to track feature type
         let selectedFeature = document.getElementById('feature-select').value;
 
         // Create the plot and store x1 and x2 values of bounding boxes

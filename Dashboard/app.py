@@ -47,26 +47,22 @@ def encode_categorical_data(categories):
 
 
 
-# Initial data load
+# Initial data load from original model
 load_data()
 
 
 @app.route('/')
 def index():
     # Render with all features available to choose from
-    X_names_list = X_train.columns.tolist()
-    # name_first_num, x_values_first_num, y_values_first_num = next(
-    #     (feature['name'], feature['x'].astype(float).tolist(), feature['y'].astype(float).tolist())
-    #     for feature in shape_functions_dict if feature['datatype'] == 'numerical'
-    # )
-    name_first_num, x_values_first_num, y_values_first_num = next(
-        (feature['name'], feature['x'].astype(float).tolist(), feature['y'].astype(float).tolist())
-        for feature in shape_functions_dict if feature['datatype'] == 'numerical'
+    X_names = X_train.columns.tolist()
+
+    feature_name, x_data, y_data, is_numeric_feature = next(
+        (feature['name'], feature['x'].astype(float).tolist(), feature['y'].astype(float).tolist(), feature['datatype'])
+        for feature in shape_functions_dict
     )
 
-    return render_template('index.html', feature_names=X_names_list, x_data=x_values_first_num,
-                           y_data=y_values_first_num,
-                           selected_feature=name_first_num)
+    return render_template('index.html', feature_names=X_names, x_data=x_data,
+                           y_data=y_data, selected_feature=feature_name, is_numeric_feature=is_numeric_feature)
 
 
 @app.route('/feature_data', methods=['POST'])
@@ -78,7 +74,6 @@ def feature_data():
         if feature_data['datatype'] == 'numerical':
             x_data = feature_data['x'].tolist()
             y_data = feature_current_state[selected_feature].tolist()
-            print(True, x_data, y_data)
             return jsonify({'is_numeric': True, 'x': x_data, 'y': y_data,
                             'selected_feature': selected_feature})
         else:
@@ -86,7 +81,6 @@ def feature_data():
             encoded_x_data = encode_categorical_data(x_data)
             y_data = feature_current_state[selected_feature]
             y_data = [float(y) if isinstance(y, np.float32) else y for y in y_data]
-            print(False, x_data, y_data, encoded_x_data)
             return jsonify({'is_numeric': False, 'original_values': x_data,
                             'x': encoded_x_data, 'y': y_data, 'selected_feature': selected_feature})
     else:
@@ -96,22 +90,35 @@ def feature_data():
 @app.route('/setConstantValue', methods=['POST'])
 def setConstantValue():
     data = request.json
-    selected_feature = data['selected_feature']
-    x1, x2, new_y = data['x1'], data['x2'], float(data['new_y'])
+    x1, x2, new_y, selected_feature = data['x1'], data['x2'], float(data['new_y']), data['selected_feature']
+    feature_data = next((item for item in shape_functions_dict if item['name'] == selected_feature), None)
     # y_data = feature_current_state[selected_feature]
     y_data = feature_current_state[selected_feature].copy()
-    x_data = next(item for item in shape_functions_dict if item['name'] == selected_feature)['x'].tolist()
-
     # history_entry = y_data.copy()
-    for i, x in enumerate(x_data):
-        if x1 <= x <= x2:
-            y_data[i] = new_y
+    if feature_data['datatype'] == 'numerical':
+        x_data = feature_data['x'].tolist()
+        for i, x in enumerate(x_data):
+            if x1 <= x <= x2:
+                y_data[i] = new_y
+        feature_history[selected_feature].append(feature_current_state[selected_feature])
 
-    feature_history[selected_feature].append(feature_current_state[selected_feature])
+        feature_current_state[selected_feature] = y_data
 
-    feature_current_state[selected_feature] = y_data
+        return jsonify({'y': y_data.tolist()})
 
-    return jsonify({'y': y_data.tolist()})
+    else:
+        x_data = feature_data['x']
+        encoded_x_data = encode_categorical_data(x_data)
+        for i, x in enumerate(encoded_x_data):
+            if x1 <= x <= x2:
+                y_data[i] = new_y
+        feature_history[selected_feature].append(feature_current_state[selected_feature])
+
+        feature_current_state[selected_feature] = y_data
+
+        return jsonify({'y': y_data})
+
+
 
 
 def find_nearest(array, value):
