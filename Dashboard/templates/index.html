@@ -71,7 +71,7 @@
             autosize: true,
             responsive: true
         };
-
+        let isNumericFeature = true; // Global variable to track feature type
         let selectedFeature = document.getElementById('feature-select').value;
 
         // Create the plot and store x1 and x2 values of bounding boxes
@@ -110,24 +110,40 @@
                 },
                 body: JSON.stringify({selected_feature: selected_feature}),
             })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        console.error('Error:', data.error);
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error:', data.error);
+                } else {
+                    isNumericFeature = data.is_numeric;
+                    let plotX = data.x;
+                    let plotY = data.y;
+
+                    if (!isNumericFeature) {
+                        layout.xaxis = {
+                            tickvals: plotX,
+                            ticktext: data.original_values
+                        };
+                        Plotly.newPlot('plot', [{
+                            x: plotX,
+                            y: plotY,
+                            type: 'bar'
+                        }], layout);
                     } else {
                         Plotly.newPlot('plot', [{
-                            x: data.x,
-                            y: data.y,
+                            x: plotX,
+                            y: plotY,
                             type: 'scatter',
                             mode: 'lines'
                         }], layout);
-                        store_x_values();
-
                     }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                });
+
+                    store_x_values();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
         }
 
         function setConstantValue() {

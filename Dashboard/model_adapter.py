@@ -10,15 +10,15 @@ class ModelAdapter():
     # It distributes the methods to the correct method of the ML models
     # using object composition
 
-    def __init__(self, model="IGANN"):
+    def __init__(self, task, model="IGANN"):
         self.model_name = model
         if self.model_name == "IGANN":
-            self.model = IGANN(task='regression')
+            self.model = IGANN(task=task)
 
     def fit(self, X_train, y_train):
         self.model.fit(X_train, y_train)
 
-    def adapt(self,  selected_features, updated_data, method, X_train, y_train):
+    def adapt(self, selected_features, updated_data, method, X_train, y_train):
         if self.model_name == "IGANN":
             self.model = IGANNAdapter(task='regression')
             if method == "reoptimize_weights":
@@ -51,11 +51,10 @@ class ModelAdapter():
 
     def get_shape_functions_as_dict(self):
         if self.model_name == "IGANN":
-             return self.model.get_shape_functions_as_dict()
+            return self.model.get_shape_functions_as_dict()
 
     def predict(self, X):
         return self.model.predict(X)
-
 
 
 class IGANNAdapter(IGANN):
@@ -65,7 +64,8 @@ class IGANNAdapter(IGANN):
     def reoptimize_weights(self, selected_feature, updated_data, X_train, y_train):
         self.fit(X_train, y_train)
         i = self.feature_names.index(selected_feature)
-        shape_information = next(item for item in self.get_shape_functions_as_dict() if item['name'] == selected_feature)
+        shape_information = next(
+            item for item in self.get_shape_functions_as_dict() if item['name'] == selected_feature)
         x = torch.tensor(shape_information['x'], dtype=torch.float32)
         y_hat = self.init_classifier.coef_[i] * x.numpy() + self.init_classifier.intercept_
         # y = training targets, adjusted for certain x values
@@ -124,7 +124,7 @@ class IGANNAdapter(IGANN):
         new_regressors = []
         # Create custom Regressor
         for index, regressor in enumerate(self.regressors):
-            new_regressor=ELM_Regressor_Spline(
+            new_regressor = ELM_Regressor_Spline(
                 n_input=regressor.n_input,
                 n_categorical_cols=regressor.n_categorical_cols,
                 n_hid=regressor.n_hid,
@@ -143,8 +143,6 @@ class IGANNAdapter(IGANN):
             new_regressor.spline_functions = spline_functions
             new_regressors.append(new_regressor)
         self.regressors = new_regressors
-
-
 
 
 class ELM_Regressor_Spline(ELM_Regressor):
@@ -174,7 +172,6 @@ class ELM_Regressor_Spline(ELM_Regressor):
             out += spline_values
         return out
 
-
     def predict_single(self, x, i):
         """
         This function computes the partial output of one base function for one feature.
@@ -199,8 +196,6 @@ class ELM_Regressor_Spline(ELM_Regressor):
                              ].unsqueeze(1)
                 spline = self.spline_functions[i]
                 out += spline(x)
-
-
 
                 if isinstance(out, np.ndarray):
                     out = torch.from_numpy(out).float()
