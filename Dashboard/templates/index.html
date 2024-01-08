@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://d3js.org/d3.v6.min.js"></script>
+    <link href="https://unpkg.com/tabulator-tables@5.5.2/dist/css/tabulator.min.css" rel="stylesheet">
+ <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js"></script>
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <title>Interactive Plot</title>
     <style>
@@ -29,31 +31,43 @@
         {% endfor %}
     </select>
     <div id="plot"></div>
-<div class="control-panel mt-4">
-    <p style="margin-bottom: 10px;"><b>Adjust the shape function:</b></p>
-    <form class="form-inline" style="margin-bottom: 20px;">
-        <input type="number" class="form-control mr-2" style="width: 70px;" id="x1-value" placeholder="x1">
-        <input type="number" class="form-control mr-2" style="width: 70px;" id="x2-value" placeholder="x2">
-        <input type="number" class="form-control mr-2" style="width: 130px;" id="new-y-value" placeholder="new y-value">
-        <button class="btn btn-primary mr-2" onclick="setConstantValue(); return false;">Set Constant Value</button>
-        <button class="btn btn-primary mr-2" onclick="setlinear(); return false;">Set Linear</button>
-        <button class="btn btn-info mr-2" onclick="setMonotonicIncrease(); return false;">Monotonic Increase</button>
-        <button class="btn btn-info mr-2" onclick="setMonotonicDecrease(); return false;">Monotonic Decrease</button>
-    </form>
-    <p style="margin-bottom: 10px;"><b>Incorporate into model and predict:</b></p>
-    <form class="form-inline">
-        <button class="btn btn-success mr-2" onclick="predictAndGetMSE(); return false;">Get MSE</button>
-        <div id="mse-output" class="btn btn-success mr-2" style="margin-right: 8px";>Calculating MSE...</div>
-        <button class="btn btn-info mr-2" onclick="performCubicSplineInterpolation(); return false;">Cubic Spline Interpolation</button>
-        <button class="btn btn-info mr-2" onclick="updateModel(); return false;">Update Model (Splines)</button>
-        <button class="btn btn-info mr-2" onclick="updateWeights(); return false;">Update Model (Weights)</button>
-    </form>
-    <p style="margin-bottom: 10px;"><b>Restore:</b></p>
-    <form class="form-inline" style="margin-bottom: 20px;">
-        <button class="btn btn-danger" style="margin-right: 8px" onclick="resetGraph(); return false;">Reset</button>
-        <button class="btn btn-secondary mr-2" onclick="undoLastChange(); return false;">Undo</button>
-    </form>
-</div>
+    <div class="control-panel mt-4">
+        <p><b>Adjust the shape function:</b></p>
+        <form class="form-inline" style="margin-bottom: 20px;">
+            <input type="number" class="form-control mr-2" style="width: 70px;" id="x1-value" placeholder="x1">
+            <input type="number" class="form-control mr-2" style="width: 70px;" id="x2-value" placeholder="x2">
+            <input type="number" class="form-control mr-2" style="width: 130px;" id="new-y-value" placeholder="new y-value">
+            <button class="btn btn-primary mr-2" onclick="setConstantValue(); return false;">Set Constant Value</button>
+            <button class="btn btn-primary mr-2" onclick="setlinear(); return false;">Set Linear</button>
+            <button class="btn btn-info mr-2" onclick="setMonotonicIncrease(); return false;">Monotonic Increase</button>
+            <button class="btn btn-info mr-2" onclick="setMonotonicDecrease(); return false;">Monotonic Decrease</button>
+        </form>
+        <p style="margin-bottom: 10px;"><b>Incorporate into model and predict:</b></p>
+        <form class="form-inline">
+            <button class="btn btn-success mr-2" onclick="predictAndGetMSE(); return false;">Get MSE</button>
+            <div id="mse-output" class="btn btn-success mr-2" style="margin-right: 8px";>Calculating MSE...</div>
+            <button class="btn btn-info mr-2" onclick="performCubicSplineInterpolation(); return false;">Cubic Spline Interpolation</button>
+            <button class="btn btn-info mr-2" onclick="updateModel(); return false;">Update Model (Splines)</button>
+            <button class="btn btn-info mr-2" onclick="updateWeights(); return false;">Update Model (Weights)</button>
+        </form>
+        <p style="margin-bottom: 10px;"><b>Restore:</b></p>
+        <form class="form-inline" style="margin-bottom: 20px;">
+            <button class="btn btn-danger" style="margin-right: 8px" onclick="resetGraph(); return false;">Reset</button>
+            <button class="btn btn-secondary mr-2" onclick="undoLastChange(); return false;">Undo</button>
+        </form>
+    </div>
+    <div class="table-responsive mt-4">
+        <table id="dynamic-table" class="table table-bordered">
+            <thead id="table-header">
+                <!-- Column headers will be dynamically added here -->
+            </thead>
+            <tbody id="table-body">
+                <!-- Rows will be dynamically added here -->
+            </tbody>
+        </table>
+    </div>
+
+
 
 
 
@@ -250,7 +264,7 @@
             .then(data => {
                 // Create the MSE output content
                 let mseOutputContent = 'Mean Squared Error on Training Set: ' + data.mse_train.toFixed(2) +
-                                       '<br>Mean Squared Error on Testing Set: ' + data.mse_test.toFixed(2);
+                                       '<br>Mean Squared Error on Validation Set: ' + data.mse_val.toFixed(2);
 
                 // Set the content to the mse-output div and show it
                 let mseOutputDiv = document.getElementById('mse-output');
@@ -318,6 +332,53 @@
                 mseOutputDiv.style.display = 'block';
             })
         }
+        function updateTable() {
+            fetch('/load_data_grid_instances', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                // TODO: replace initial by a variable
+                body: JSON.stringify({type_of_data: 'initial'})
+            })
+                .then(response => response.json())
+                .then(data => {
+                    createTableHeader(data.columns);
+                    populateTableBody(data.rows);
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function createTableHeader(columns) {
+            const thead = document.getElementById('table-header');
+            thead.innerHTML = ''; // Clear existing header
+
+            const tr = document.createElement('tr');
+            columns.forEach(col => {
+                const th = document.createElement('th');
+                th.textContent = col;
+                tr.appendChild(th);
+            });
+            thead.appendChild(tr);
+        }
+
+        function populateTableBody(rows) {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = ''; // Clear existing rows
+
+            rows.forEach(row => {
+                const tr = document.createElement('tr');
+                row.forEach(cell => {
+                    const td = document.createElement('td');
+                    td.textContent = cell;
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+// Call this function to initialize the table
+updateTable();
 
 
     </script>

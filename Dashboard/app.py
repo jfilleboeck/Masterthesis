@@ -13,7 +13,7 @@ from data_preprocessing import load_and_preprocess_data
 from model_adapter import ModelAdapter
 
 # Load and split the data, determine if classification/regression
-X_train, X_test, y_train, y_test, task = load_and_preprocess_data(dataset='diabetes')
+X_train, X_val, y_train, y_val, task = load_and_preprocess_data(dataset='diabetes')
 
 model = ModelAdapter(task)
 
@@ -94,6 +94,7 @@ def setConstantValue():
     feature_data = next((item for item in shape_functions_dict if item['name'] == selected_feature), None)
     # y_data = feature_current_state[selected_feature]
     y_data = feature_current_state[selected_feature].copy()
+    print(type(feature_data['x']))
     # history_entry = y_data.copy()
     if feature_data['datatype'] == 'numerical':
         x_data = feature_data['x'].tolist()
@@ -198,13 +199,13 @@ def cubic_spline_interpolate():
 def predict_and_get_mse():
     # Use the global model to predict and calculate MSE
     y_train_pred = model.predict(X_train)
-    y_test_pred = model.predict(X_test)
+    y_val_pred = model.predict(X_val)
 
     mse_train = mean_squared_error(y_train, y_train_pred)
-    mse_test = mean_squared_error(y_test, y_test_pred)
+    mse_val = mean_squared_error(y_val, y_val_pred)
 
     # Return the MSE values as JSON
-    return jsonify({'mse_train': mse_train, 'mse_test': mse_test})
+    return jsonify({'mse_train': mse_train, 'mse_val': mse_val})
 
 
 @app.route('/get_original_data', methods=['POST'])
@@ -279,13 +280,34 @@ def update_model():
     model.adapt(list_of_features, feature_spline_state, X_train, y_train, method="spline")
 
     y_train_pred = model.predict(X_train)
-    y_test_pred = model.predict(X_test)
+    y_val_pred = model.predict(X_val)
 
     mse_train = mean_squared_error(y_train, y_train_pred)
-    mse_test = mean_squared_error(y_test, y_test_pred)
+    mse_val = mean_squared_error(y_val, y_val_pred)
 
     # Return the MSE values as JSON
-    return jsonify({'mse_train': mse_train, 'mse_test': mse_test})
+    return jsonify({'mse_train': mse_train, 'mse_val': mse_val})
+
+@app.route('/load_data_grid_instances', methods=['POST'])
+def load_data_grid_instances():
+    data = request.json
+    if data['type_of_data'] == 'initial':
+        combined_data = pd.concat([X_val, y_val], axis=1)
+
+        # Convert to a format suitable for JSON response
+        columns = combined_data.columns.tolist()
+        rows = combined_data.values.tolist()
+
+        response = {
+            'columns': columns,
+            'rows': rows
+        }
+        return jsonify(response)
+
+    return jsonify({'error': 'Invalid request'}), 400
+
+
+
 
 
 if __name__ == '__main__':
