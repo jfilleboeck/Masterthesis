@@ -294,6 +294,10 @@ def load_data_grid_instances():
     if data['type_of_data'] == 'initial':
         combined_data = pd.concat([X_val, y_val], axis=1)
 
+        # Round to three digits
+        for col in combined_data.select_dtypes(include=[np.number]).columns:
+            combined_data[col] = combined_data[col].round(3)
+
         # Convert to a format suitable for JSON response
         columns = combined_data.columns.tolist()
         rows = combined_data.values.tolist()
