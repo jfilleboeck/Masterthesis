@@ -285,32 +285,19 @@ def update_model():
     mse_train = mean_squared_error(y_train, y_train_pred)
     mse_val = mean_squared_error(y_val, y_val_pred)
 
-    # Return the MSE values as JSON
     return jsonify({'mse_train': mse_train, 'mse_val': mse_val})
 
 @app.route('/load_data_grid_instances', methods=['POST'])
 def load_data_grid_instances():
     data = request.json
-    if data['type_of_data'] == 'initial':
+    if data and data.get('type_of_data') == 'initial':
         combined_data = pd.concat([X_val, y_val], axis=1)
+        combined_data = combined_data.round(3)
+        rows = combined_data.to_dict(orient='records')
 
-        # Round to three digits
-        for col in combined_data.select_dtypes(include=[np.number]).columns:
-            combined_data[col] = combined_data[col].round(3)
-
-        # Convert to a format suitable for JSON response
-        columns = combined_data.columns.tolist()
-        rows = combined_data.values.tolist()
-
-        response = {
-            'columns': columns,
-            'rows': rows
-        }
-        return jsonify(response)
+        return jsonify(rows)
 
     return jsonify({'error': 'Invalid request'}), 400
-
-
 
 
 
