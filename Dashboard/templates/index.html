@@ -149,18 +149,24 @@
                     let plotX = data.x;
                     let plotY = data.y;
 
+                    // Reset the axis layout
+                    layout.xaxis = {};
+                    layout.yaxis = {};
+
                     if (!isNumericFeature) {
+                        // Set the x-axis layout for categorical data
                         layout.xaxis = {
                             tickvals: plotX,
                             ticktext: data.original_values
                         };
-                        Plotly.newPlot('plot', [{
+                        Plotly.react('plot', [{
                             x: plotX,
                             y: plotY,
                             type: 'bar'
                         }], layout);
                     } else {
-                        Plotly.newPlot('plot', [{
+                        // Update the plot for numeric data
+                        Plotly.react('plot', [{
                             x: plotX,
                             y: plotY,
                             type: 'scatter',
@@ -176,10 +182,16 @@
             });
         }
 
+
         function setConstantValue() {
             const x1 = parseFloat(document.getElementById('x1-value').value);
             const x2 = parseFloat(document.getElementById('x2-value').value);
             const newYValue = parseFloat(document.getElementById('new-y-value').value);
+
+            // Store the current x-axis and y-axis range
+            const gd = document.getElementById('plot');
+            const currentXAxisRange = gd.layout.xaxis.range;
+            const currentYAxisRange = gd.layout.yaxis.range;
 
             fetch('/setConstantValue', {
                 method: 'POST',
@@ -190,9 +202,17 @@
             })
             .then(response => response.json())
             .then(data => {
-                Plotly.update('plot', {y: [data.y]});
+                Plotly.update('plot', {y: [data.y]}).then(() => {
+                    // Reapply the stored range values to maintain the zoom level
+                    Plotly.relayout(gd, {
+                        'xaxis.range': currentXAxisRange,
+                        'yaxis.range': currentYAxisRange
+                    });
+                });
             });
         }
+
+
 
         function setMonotonicIncrease() {
             const x1 = parseFloat(document.getElementById('x1-value').value);
