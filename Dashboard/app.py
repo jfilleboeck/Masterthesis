@@ -70,19 +70,29 @@ def feature_data():
     data = request.json
     selected_feature = data['selected_feature']
     feature_data = next((item for item in shape_functions_dict if item['name'] == selected_feature), None)
+    print(feature_data)
     if feature_data:
         if feature_data['datatype'] == 'numerical':
             x_data = feature_data['x'].tolist()
             y_data = feature_current_state[selected_feature].tolist()
+            # Convert histogram data and bin_edges to list
+            hist_data = feature_data['hist'].hist.tolist()
+            bin_edges = feature_data['hist'].bin_edges.tolist()
             return jsonify({'is_numeric': True, 'x': x_data, 'y': y_data,
-                            'selected_feature': selected_feature})
+                            'selected_feature': selected_feature,
+                            'histogram': hist_data, 'bin_edges': bin_edges})
         else:
             x_data = feature_data['x']
             encoded_x_data = encode_categorical_data(x_data)
             y_data = feature_current_state[selected_feature]
             y_data = [float(y) if isinstance(y, np.float32) else y for y in y_data]
+            # Convert histogram data and bin_edges to list
+            hist_data = feature_data['hist'].hist.tolist()
+            bin_edges = feature_data['hist'].bin_edges.tolist()
             return jsonify({'is_numeric': False, 'original_values': x_data,
-                            'x': encoded_x_data, 'y': y_data, 'selected_feature': selected_feature})
+                            'x': encoded_x_data, 'y': y_data,
+                            'hist': hist_data, 'bin_edges': bin_edges,
+                            'selected_feature': selected_feature})
     else:
         return jsonify({'error': 'Feature not found'}), 404
 

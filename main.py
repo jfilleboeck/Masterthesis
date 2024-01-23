@@ -22,16 +22,17 @@ if __name__ == "__main__":
     print("Running main script")
 
 # Load and split the data
-X_train, X_test, y_train, y_test = load_and_preprocess_data()
-model = ModelAdapter()
+X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
+model = ModelAdapter(task)
 
 #model = IGANN(task='regression')
 model.fit(X_train, y_train)
-model.plot_single(plot_by_list=['age', 'bmi', 'bp', 'sex', 's1', 's2'])
+#model.plot_single(plot_by_list=['age', 'bmi', 'bp', 'sex', 's1', 's2'])
 
 
 # Initial data load
 shape_functions_dict = model.get_shape_functions_as_dict()
+print(shape_functions_dict)
 feature_history = {feature['name']: [feature['y']] for feature in shape_functions_dict}
 feature_current_state = {feature['name']: feature['y'] for feature in shape_functions_dict}
 feature_spline_state = {feature['name']: feature['y'] for feature in shape_functions_dict}

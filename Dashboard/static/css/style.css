@@ -1,0 +1,32 @@
+.control-panel {
+    margin-top: 20px;
+}
+#plot {
+    margin-top: 30px;
+}
+.control-panel {
+    margin-top: 30px;
+}
+
+.table-responsive {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+
+#dynamic-table thead th {
+    position: sticky;
+    top: 0;
+    background-color: white;
+    z-index: 1;
+}
+
+#dynamic-table td {
+    height: 10px;
+    vertical-align: middle;
+}
+
+
+#dynamic-table {
+    table-layout: auto;
+}
