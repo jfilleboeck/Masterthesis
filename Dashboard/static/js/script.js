@@ -1,4 +1,4 @@
-// Variables for creating the plot
+// Initial Plot creation
 const plotData = [{
     x: xData,
     y: yData,
@@ -23,58 +23,40 @@ plotData[0].hovertemplate = hoverTextArray;
 Plotly.newPlot('plot', plotData, layout).then(() => {
     console.log("Plot created");
     store_x_values();
-    createHistogramPlot();
+    createHistogramPlot(hist_data, bin_edges);
 });
 
-function drawLines(x, y) {
-    const update = {
-        shapes: [
-            {
-                type: 'line',
-                x0: x,
-                y0: y,
-                x1: x,
-                y1: layout.yaxis.range[0],
-                line: {
-                    color: 'red',
-                    width: 2,
-                    dash: 'dot',
-                },
-            },
-            {
-                type: 'line',
-                x0: x,
-                y0: y,
-                x1: layout.xaxis.range[0],
-                y1: y,
-                line: {
-                    color: 'red',
-                    width: 2,
-                    dash: 'dot',
-                },
-            }
-        ]
+function createHistogramPlot(hist_data, bin_edges) {
+    // Prepare data for the plot
+    var trace = {
+        x: bin_edges,
+        y: hist_data.map(x => Math.abs(x)),
+        type: 'bar',
+        marker: {
+            color: 'blue' // You can choose the color
+        },
+        hoverinfo: 'x+y', // Shows original y value on hover
     };
 
-    Plotly.relayout('plot', update);
+    var layout = {
+        xaxis: {
+            title: 'Bins'
+        },
+        yaxis: {
+            title: 'Frequency',
+            tickmode: 'auto',
+            nticks: 2
+        },
+        bargap: 0.05,
+        height: 250// Adjust the gap between bars if needed
+    };
+
+    Plotly.newPlot('histogram-plot', [trace], layout);
 }
 
-var plotDiv = document.getElementById('plot');
-// plotDiv.on('plotly_hover', function(data){
-//     const xValue = data.points[0].x;
-//     const yValue = data.points[0].y;
-//     drawLines(xValue, yValue);
-// });
 
-function store_x_values() {
-    document.getElementById('plot').on('plotly_selected', function(data) {
-        if (!data) return;
-        const x1 = data.range.x[0];
-        const x2 = data.range.x[1];
-        document.getElementById('x1-value').value = x1.toFixed(2);
-        document.getElementById('x2-value').value = x2.toFixed(2);
-    });
-};
+// Event listener and feature selection
+
 
 document.addEventListener('DOMContentLoaded', function() {
     const selectBox = document.getElementById('feature-select');
@@ -129,8 +111,8 @@ function fetchFeatureData(selected_feature) {
                     mode: 'lines'
                 }], layout);
             }
-            if (data.histogram && data.bin_edges) {
-                createHistogramPlot(data.histogram, data.bin_edges);
+            if (data.hist_data && data.bin_edges) {
+                createHistogramPlot(data.hist_data, data.bin_edges);
             }
 
             store_x_values();
@@ -141,39 +123,9 @@ function fetchFeatureData(selected_feature) {
     });
 }
 
-function createHistogramPlot(histogram, bin_edges) {
-    // Ensure that histogram and bin_edges are of equal length
-    if (histogram.length !== bin_edges.length - 1) {
-        console.error("Histogram and bin edges length mismatch");
-        return;
-    }
-
-    // Prepare data for the plot
-    var trace = {
-        x: bin_edges,
-        y: histogram.map(x => -Math.abs(x)), // Negate the values for downward extension
-        type: 'bar',
-        marker: {
-            color: 'blue' // You can choose the color
-        },
-        hoverinfo: 'x+y', // Shows original y value on hover
-    };
-
-    var layout = {
-        title: 'Downward Extending Histogram',
-        xaxis: {
-            title: 'Bins'
-        },
-        yaxis: {
-            title: 'Frequency'
-        },
-        bargap: 0.05 // Adjust the gap between bars if needed
-    };
-
-    Plotly.newPlot('histogram-plot', [trace], layout);
-}
 
 
+// User options to adjust spline functions
 
 
 function setConstantValue() {
@@ -361,6 +313,19 @@ function updateModel() {
         mseOutputDiv.style.display = 'block';
     })
 }
+
+
+// Helper functions:
+function store_x_values() {
+    document.getElementById('plot').on('plotly_selected', function(data) {
+        if (!data) return;
+        const x1 = data.range.x[0];
+        const x2 = data.range.x[1];
+        document.getElementById('x1-value').value = x1.toFixed(2);
+        document.getElementById('x2-value').value = x2.toFixed(2);
+    });
+};
+
 // Function to generate columns based on JSON keys
 function generateColumns(data) {
     var columns = [];

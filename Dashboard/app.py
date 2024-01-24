@@ -56,13 +56,16 @@ def index():
     # Render with all features available to choose from
     X_names = X_train.columns.tolist()
 
-    feature_name, x_data, y_data, is_numeric_feature = next(
-        (feature['name'], feature['x'].astype(float).tolist(), feature['y'].astype(float).tolist(), feature['datatype'])
+    feature_name, x_data, y_data, is_numeric_feature, hist_data, bin_edges = next(
+        (feature['name'], feature['x'].astype(float).tolist(),
+         feature['y'].astype(float).tolist(), feature['datatype'],
+         feature['hist'].hist.tolist(), feature['hist'].bin_edges.tolist())
         for feature in shape_functions_dict
     )
 
     return render_template('index.html', feature_names=X_names, x_data=x_data,
-                           y_data=y_data, selected_feature=feature_name, is_numeric_feature=is_numeric_feature)
+                           y_data=y_data, selected_feature=feature_name, is_numeric_feature=is_numeric_feature,
+                           hist_data=hist_data, bin_edges=bin_edges)
 
 
 @app.route('/feature_data', methods=['POST'])
@@ -80,7 +83,7 @@ def feature_data():
             bin_edges = feature_data['hist'].bin_edges.tolist()
             return jsonify({'is_numeric': True, 'x': x_data, 'y': y_data,
                             'selected_feature': selected_feature,
-                            'histogram': hist_data, 'bin_edges': bin_edges})
+                            'hist_data': hist_data, 'bin_edges': bin_edges})
         else:
             x_data = feature_data['x']
             encoded_x_data = encode_categorical_data(x_data)

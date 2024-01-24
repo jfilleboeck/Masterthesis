@@ -13,6 +13,10 @@
     overflow-y: auto;
 }
 
+/*#histogram-plot {*/
+/*    height: 200px; !* Adjust this value as needed *!*/
+/*}*/
+
 
 #dynamic-table thead th {
     position: sticky;

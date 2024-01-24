@@ -11,6 +11,8 @@
         var xData = {{ x_data|tojson }};
         var yData = {{ y_data|tojson }};
         var isNumericFeature = {{ is_numeric_feature|tojson }};
+        var hist_data = {{ hist_data|tojson }};
+        var bin_edges = {{ bin_edges|tojson }};
     </script>
     <title>Interactive Plot</title>
     <link href="../static/css/style.css" rel="stylesheet">
@@ -24,8 +26,15 @@
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
     </select>
-    <div id="plot"></div>
-    <div id="histogram-plot"></div>
+    <div class="row">
+        <div class="col-md-8">
+            <div id="plot"></div>
+        </div>
+        <!-- Column for the histogram -->
+        <div class="col-md-4">
+            <div id="histogram-plot"></div>
+        </div>
+
     <div class="control-panel mt-4">
         <p><b>Adjust the shape function:</b></p>
         <form class="form-inline" style="margin-bottom: 20px;">
@@ -50,8 +59,8 @@
             <button class="btn btn-danger" style="margin-right: 8px" onclick="resetGraph(); return false;">Reset</button>
             <button class="btn btn-secondary mr-2" onclick="undoLastChange(); return false;">Undo</button>
         </form>
+        <div id="datagrid-table"></div>
     </div>
-    <div id="datagrid-table"></div>
     <script src="../static/js/script.js"></script>
 </body>
 </html>
