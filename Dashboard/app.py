@@ -1,11 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import numpy as np
-from sklearn.datasets import load_diabetes
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from igann import IGANN
-from scipy.interpolate import PchipInterpolator
+from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import mean_squared_error
 from scipy.interpolate import CubicSpline
 
@@ -133,62 +129,69 @@ def setConstantValue():
         return jsonify({'y': y_data})
 
 
+def perform_weighted_isotonic_regression(x_data, y_data, hist_counts, bin_edges, increasing=True):
+    # Determine the bin index for each x_data point
+    bin_indices = np.digitize(x_data, bin_edges, right=True).astype(int)
+    bin_indices = np.clip(bin_indices, 1, len(hist_counts))
 
+    weights = np.array([hist_counts[index - 1] for index in bin_indices])
 
-def find_nearest(array, value):
-    """Find the index of the nearest value in the array."""
-    array = np.asarray(array)
-    idx = (np.abs(array - value)).argmin()
-    return idx
+    iso_reg = IsotonicRegression(increasing=increasing)
+    iso_reg.fit(x_data, y_data, sample_weight=weights)
+    y_pred = iso_reg.predict(x_data)
+
+    return y_pred
 
 
 @app.route('/monotonic_increase', methods=['POST'])
 def monotonic_increase():
     data = request.json
     selected_feature = data['selected_feature']
-
-    y_data = feature_current_state[selected_feature].copy()
-    x_data = next(item for item in shape_functions_dict if item['name'] == selected_feature)['x'].tolist()
-
-    # feature_history[selected_feature].append(y_data.copy())
-    feature_history[selected_feature].append(feature_current_state[selected_feature])
-
     x1, x2 = data['x1'], data['x2']
-    start_index = max(find_nearest(x_data, x1), 1)  # Ensure start_index is greater than 0
-    end_index = find_nearest(x_data, x2)
+    y_data_full = feature_current_state[selected_feature].copy()
 
-    for i in range(start_index + 1, end_index):
-        y_data[i] = max(y_data[i], y_data[i - 1])
+    selected_item = next(item for item in shape_functions_dict if item['name'] == selected_feature)
+    # Numpy arrays are required for the IsotonicRegression package
+    x_data = np.array(selected_item['x'])
+    hist_data = np.array(selected_item['hist'].hist)
+    bin_edges = np.array(selected_item['hist'].bin_edges)
 
-    feature_current_state[selected_feature] = y_data
+    indices = np.where((x_data >= x1) & (x_data <= x2))[0]
+    y_pred_subset = perform_weighted_isotonic_regression(
+        x_data[indices], y_data_full[indices], hist_data, bin_edges, increasing=True)
 
-    return jsonify({'y': y_data.tolist()})
+    y_data_full[indices] = y_pred_subset
+
+    # Update feature history and current state
+    feature_history[selected_feature].append(feature_current_state[selected_feature])
+    feature_current_state[selected_feature] = y_data_full
+
+    return jsonify({'y': y_data_full.tolist()})
 
 
 @app.route('/monotonic_decrease', methods=['POST'])
 def monotonic_decrease():
     data = request.json
     selected_feature = data['selected_feature']
+    x1, x2 = data['x1'], data['x2']
+    y_data_full = feature_current_state[selected_feature].copy()
 
-    y_data = feature_current_state[selected_feature].copy()
-    x_data = next(item for item in shape_functions_dict if item['name'] == selected_feature)['x'].tolist()
+    selected_item = next(item for item in shape_functions_dict if item['name'] == selected_feature)
+    # Numpy arrays are required for the IsotonicRegression package
+    x_data = np.array(selected_item['x'])
+    hist_data = np.array(selected_item['hist'].hist)
+    bin_edges = np.array(selected_item['hist'].bin_edges)
+
+    indices = np.where((x_data >= x1) & (x_data <= x2))[0]
+    y_pred_subset = perform_weighted_isotonic_regression(
+        x_data[indices], y_data_full[indices], hist_data, bin_edges, increasing=False)
+
+    y_data_full[indices] = y_pred_subset
 
     feature_history[selected_feature].append(feature_current_state[selected_feature])
+    feature_current_state[selected_feature] = y_data_full
 
-    x1, x2 = data['x1'], data['x2']
-    start_index = find_nearest(x_data, x1)
-    end_index = find_nearest(x_data, x2)
-
-    for i in range(end_index, start_index, -1):
-        y_data[i - 1] = min(y_data[i - 1], y_data[i])
-
-    if y_data[start_index] < y_data[end_index]:
-        y_data[start_index] = y_data[end_index]
-
-    # Save the modified state
-    feature_current_state[selected_feature] = y_data
-
-    return jsonify({'y': y_data.tolist()})
+    return jsonify({'y': y_data_full.tolist()})
 
 
 @app.route('/cubic_spline_interpolate', methods=['POST'])

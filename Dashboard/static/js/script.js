@@ -244,8 +244,8 @@ function predictAndGetMSE() {
     .then(response => response.json())
     .then(data => {
         // Create the MSE output content
-        let mseOutputContent = 'Mean Squared Error on Training Set: ' + data.mse_train.toFixed(2) +
-                               '<br>Mean Squared Error on Validation Set: ' + data.mse_val.toFixed(2);
+        let mseOutputContent = 'MSE Training: ' + data.mse_train.toFixed(2) +
+                               '<br>MSE Validation: ' + data.mse_val.toFixed(2);
 
         // Set the content to the mse-output div and show it
         let mseOutputDiv = document.getElementById('mse-output');

@@ -33,6 +33,10 @@
         <!-- Column for the histogram -->
         <div class="col-md-4">
             <div id="histogram-plot"></div>
+            <form class="form-inline" style="margin-bottom: 20px;">
+                <button class="btn btn-success mr-2" onclick="predictAndGetMSE(); return false;">Get MSE</button>
+                <div id="mse-output" class="btn btn-success mr-2" style="margin-right: 8px";>Calculating MSE...</div>
+            </form>
         </div>
 
     <div class="control-panel mt-4">
@@ -46,19 +50,15 @@
             <button class="btn btn-info mr-2" onclick="setMonotonicIncrease(); return false;">Monotonic Increase</button>
             <button class="btn btn-info mr-2" onclick="setMonotonicDecrease(); return false;">Monotonic Decrease</button>
         </form>
-        <p style="margin-bottom: 10px;"><b>Incorporate into model and predict:</b></p>
+        <p style="margin-bottom: 10px;"><b>Incorporate into model:</b></p>
         <form class="form-inline">
-            <button class="btn btn-success mr-2" onclick="predictAndGetMSE(); return false;">Get MSE</button>
-            <div id="mse-output" class="btn btn-success mr-2" style="margin-right: 8px";>Calculating MSE...</div>
             <button class="btn btn-info mr-2" onclick="performCubicSplineInterpolation(); return false;">Cubic Spline Interpolation</button>
             <button class="btn btn-info mr-2" onclick="updateModel(); return false;">Update Model (Splines)</button>
             <button class="btn btn-info mr-2" onclick="updateWeights(); return false;">Update Model (Weights)</button>
-        </form>
-        <p style="margin-bottom: 10px;"><b>Restore:</b></p>
-        <form class="form-inline" style="margin-bottom: 20px;">
             <button class="btn btn-danger" style="margin-right: 8px" onclick="resetGraph(); return false;">Reset</button>
             <button class="btn btn-secondary mr-2" onclick="undoLastChange(); return false;">Undo</button>
         </form>
+        <p style="margin-bottom: 10px;"><br><b>Validation data:</b></p>
         <div id="datagrid-table"></div>
     </div>
     <script src="../static/js/script.js"></script>
