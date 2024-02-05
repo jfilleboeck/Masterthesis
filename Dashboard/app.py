@@ -4,12 +4,12 @@ import numpy as np
 from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import mean_squared_error
 from scipy.interpolate import CubicSpline
-
+import torch
 from data_preprocessing import load_and_preprocess_data
 from model_adapter import ModelAdapter
 
 # Load and split the data, determine if classification/regression
-X_train, X_val, y_train, y_val, task = load_and_preprocess_data(dataset='diabetes')
+X_train, X_val, y_train, y_val, task = load_and_preprocess_data(dataset='titanic')
 
 model = ModelAdapter(task)
 
@@ -69,7 +69,6 @@ def feature_data():
     data = request.json
     selected_feature = data['selected_feature']
     feature_data = next((item for item in shape_functions_dict if item['name'] == selected_feature), None)
-    print(feature_data)
     if feature_data:
         if feature_data['datatype'] == 'numerical':
             x_data = feature_data['x'].tolist()
@@ -85,48 +84,88 @@ def feature_data():
             encoded_x_data = encode_categorical_data(x_data)
             y_data = feature_current_state[selected_feature]
             y_data = [float(y) if isinstance(y, np.float32) else y for y in y_data]
-            # Convert histogram data and bin_edges to list
-            hist_data = feature_data['hist'].hist.tolist()
-            bin_edges = feature_data['hist'].bin_edges.tolist()
+            # Convert histogram data to list
+            hist_data = to_float_list(feature_data['hist'][0])
+            bin_edges = encode_categorical_data(feature_data['hist'][1])
             return jsonify({'is_numeric': False, 'original_values': x_data,
                             'x': encoded_x_data, 'y': y_data,
-                            'hist': hist_data, 'bin_edges': bin_edges,
+                            'hist_data': hist_data, 'bin_edges': bin_edges,
                             'selected_feature': selected_feature})
     else:
         return jsonify({'error': 'Feature not found'}), 404
 
+def to_float_list(lst):
+    float_list = []
+    for item in lst:
+        if torch.is_tensor(item):
+            float_list.append(item.item())
+        elif isinstance(item, list):
+            for sub_item in item:
+                if torch.is_tensor(sub_item):
+                    float_list.append(sub_item.item())
+    return float_list
 
 @app.route('/setConstantValue', methods=['POST'])
 def setConstantValue():
     data = request.json
     x1, x2, new_y, selected_feature = data['x1'], data['x2'], float(data['new_y']), data['selected_feature']
     feature_data = next((item for item in shape_functions_dict if item['name'] == selected_feature), None)
-    # y_data = feature_current_state[selected_feature]
+    if not feature_data:
+        return jsonify({'error': 'Feature not found'}), 404
+
     y_data = feature_current_state[selected_feature].copy()
-    print(type(feature_data['x']))
-    # history_entry = y_data.copy()
+
     if feature_data['datatype'] == 'numerical':
-        x_data = feature_data['x'].tolist()
-        for i, x in enumerate(x_data):
-            if x1 <= x <= x2:
-                y_data[i] = new_y
-        feature_history[selected_feature].append(feature_current_state[selected_feature])
-
-        feature_current_state[selected_feature] = y_data
-
-        return jsonify({'y': y_data.tolist()})
-
-    else:
         x_data = feature_data['x']
-        encoded_x_data = encode_categorical_data(x_data)
-        for i, x in enumerate(encoded_x_data):
-            if x1 <= x <= x2:
-                y_data[i] = new_y
-        feature_history[selected_feature].append(feature_current_state[selected_feature])
+    else:
+        x_data = encode_categorical_data(feature_data['x'])
 
-        feature_current_state[selected_feature] = y_data
+    for i, x in enumerate(x_data):
+        if x1 <= x <= x2:
+            y_data[i] = new_y
 
-        return jsonify({'y': y_data})
+    feature_history[selected_feature].append(y_data)
+    feature_current_state[selected_feature] = y_data
+
+    return jsonify({'y': y_data if feature_data['datatype'] != 'numerical' else y_data.tolist()})
+
+
+@app.route('/setLinear', methods=['POST'])
+def setLinear():
+    data = request.json
+    x1, x2, selected_feature = data['x1'], data['x2'], data['selected_feature']
+    feature_data = next((item for item in shape_functions_dict if item['name'] == selected_feature), None)
+    print(feature_data)
+    if not feature_data:
+        return jsonify({'error': 'Feature not found'}), 404
+
+    y_data = feature_current_state[selected_feature].copy()
+
+    if feature_data['datatype'] == 'numerical':
+        x_data = feature_data['x']
+    else:
+        x_data = encode_categorical_data(feature_data['x'])
+
+    # Find indices for x1 and x2
+    index_x1 = min(range(len(x_data)), key=lambda i: abs(x_data[i]-x1))
+    index_x2 = min(range(len(x_data)), key=lambda i: abs(x_data[i]-x2))
+
+    # Ensure indices are in the correct order
+    index_start, index_end = sorted([index_x1, index_x2])
+
+    slope = (y_data[index_end] - y_data[index_start]) / (x_data[index_end] - x_data[index_start])
+
+    # Update y values along the line
+    for i in range(index_start, index_end + 1):
+        y_data[i] = y_data[index_start] + slope * (x_data[i] - x_data[index_start])
+
+    print(index_start, index_end, slope)
+    feature_history[selected_feature].append(y_data)
+    feature_current_state[selected_feature] = y_data
+
+
+
+    return jsonify({'y': y_data if feature_data['datatype'] != 'numerical' else y_data.tolist()})
 
 
 def perform_weighted_isotonic_regression(x_data, y_data, hist_counts, bin_edges, increasing=True):
@@ -265,8 +304,8 @@ def undo_last_change():
         return jsonify({'error': 'No more changes to undo for feature ' + selected_feature}), 400
 
 
-@app.route('/update_weights', methods=['POST'])
-def update_weights():
+@app.route('/retrain_feature', methods=['POST'])
+def retrain_feature():
     data = request.json
     selected_feature = data['selected_feature']
     feature_data_dict = next(item for item in model.get_shape_functions_as_dict() if item['name'] == selected_feature)
@@ -274,7 +313,7 @@ def update_weights():
     print(selected_feature)
     y_data = feature_current_state[selected_feature]
     print(y_data)
-    model.adapt(selected_feature, y_data, "reoptimize_weights", X_train, y_train)
+    model.adapt(selected_feature, y_data, "retrain_feature", X_train, y_train)
     # TODO: Archivierung
     # TODO: Momentan werden alle Features zurückgesetzt
 

@@ -28,6 +28,7 @@ Plotly.newPlot('plot', plotData, layout).then(() => {
 
 function createHistogramPlot(hist_data, bin_edges) {
     // Prepare data for the plot
+    console.log("Creating new Histogram Plot");
     var trace = {
         x: bin_edges,
         y: hist_data.map(x => Math.abs(x)),
@@ -93,6 +94,7 @@ function fetchFeatureData(selected_feature) {
 
             if (!isNumericFeature) {
                 // Set the x-axis layout for categorical data
+                console.log("Categorical Feature")
                 layout.xaxis = {
                     tickvals: plotX,
                     ticktext: data.original_values
@@ -104,6 +106,7 @@ function fetchFeatureData(selected_feature) {
                 }], layout);
             } else {
                 // Update the plot for numeric data
+                console.log("Numerical Feature")
                 Plotly.react('plot', [{
                     x: plotX,
                     y: plotY,
@@ -111,6 +114,8 @@ function fetchFeatureData(selected_feature) {
                     mode: 'lines'
                 }], layout);
             }
+            console.log("Both")
+            console.log(data.bin_edges)
             if (data.hist_data && data.bin_edges) {
                 createHistogramPlot(data.hist_data, data.bin_edges);
             }
@@ -157,6 +162,36 @@ function setConstantValue() {
     });
 }
 
+function setLinear() {
+    const x1 = parseFloat(document.getElementById('x1-value').value);
+    const x2 = parseFloat(document.getElementById('x2-value').value);
+
+    // Store the current x-axis and y-axis range
+    const gd = document.getElementById('plot');
+    const currentXAxisRange = gd.layout.xaxis.range;
+    const currentYAxisRange = gd.layout.yaxis.range;
+
+    // Options: Inplace Interpolation,  Stepwise
+
+
+    fetch('/setLinear', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({x1: x1, x2: x2, selected_feature: selectedFeature})
+    })
+    .then(response => response.json())
+    .then(data => {
+        Plotly.update('plot', {y: [data.y]}).then(() => {
+            // Reapply the stored range values to maintain the zoom level
+            Plotly.relayout(gd, {
+                'xaxis.range': currentXAxisRange,
+                'yaxis.range': currentYAxisRange
+            });
+        });
+    });
+}
 
 
 function setMonotonicIncrease() {
@@ -222,10 +257,9 @@ function performCubicSplineInterpolation() {
     })
 }
 
-function updateWeights() {
+function retrainFeature() {
     const selectedFeature = document.getElementById('feature-select').value;
-    console.log("that worked")
-    fetch('/update_weights', {
+    fetch('/retrain_feature', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -363,3 +397,5 @@ function fetchDataAndCreateTable() {
     .then(data => createTable(data))
     .catch(error => console.error('Error:', error));
 }
+
+

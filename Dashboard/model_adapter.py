@@ -13,19 +13,17 @@ class ModelAdapter():
     def __init__(self, task, model="IGANN"):
         self.model_name = model
         if self.model_name == "IGANN":
-            self.model = IGANN(task=task)
+            self.model = IGANNAdapter(task=task)
 
     def fit(self, X_train, y_train):
         self.model.fit(X_train, y_train)
 
-    def adapt(self, selected_features, updated_data, method, X_train, y_train):
+    def adapt(self, features_to_change, updated_data, method, X_train, y_train):
         if self.model_name == "IGANN":
-            self.model = IGANNAdapter(task='regression')
-            if method == "reoptimize_weights":
-                self.model.reoptimize_weights(selected_features, updated_data, X_train, y_train)
+            if method == "retrain_feature":
+                self.model.retrain_feature(features_to_change, updated_data, X_train, y_train)
             if method == "spline":
-                self.model.update_model_with_spline(selected_features, updated_data, X_train, y_train)
-
+                self.model.spline_interpolation(features_to_change, updated_data, X_train, y_train)
         return self.model
 
     def plot_single(self, plot_by_list):
@@ -61,49 +59,88 @@ class IGANNAdapter(IGANN):
     def __init__(self, *args, **kwargs):
         super(IGANNAdapter, self).__init__(*args, **kwargs)
 
-    def reoptimize_weights(self, selected_feature, updated_data, X_train, y_train):
-        self.fit(X_train, y_train)
-        i = self.feature_names.index(selected_feature)
-        shape_information = next(
-            item for item in self.get_shape_functions_as_dict() if item['name'] == selected_feature)
-        x = torch.tensor(shape_information['x'], dtype=torch.float32)
-        y_hat = self.init_classifier.coef_[i] * x.numpy() + self.init_classifier.intercept_
-        # y = training targets, adjusted for certain x values
-        y = torch.tensor(updated_data, dtype=torch.float32) - y_hat
-        # TODO: Y_VAL ?
-        for counter, regressor in enumerate(self.regressors):
-            hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
-            y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat)
-            new_regressor = ELM_Regressor(
-                n_input=1,
-                # TODO: Für kategorische Werte, muss n.categorical_cols angepasst werden
-                n_categorical_cols=0,
-                n_hid=self.n_hid,
-                seed=counter,
-                elm_scale=self.elm_scale,
-                elm_alpha=self.elm_alpha,
-                act=self.act,
-                device=self.device,
-            )
-            X_hid = new_regressor.fit(
-                x.reshape(-1, 1),
-                y_tilde,
-                torch.sqrt(torch.tensor(0.5).to(self.device))
-                * self.boost_rate
-                * hessian_train_sqrt[:, None],
-            )
-            # Make a prediction of the ELM for the update of y_hat
-            train_regressor_pred = new_regressor.predict(X_hid, hidden=True).squeeze()
-            # Update the prediction for training and validation data
-            y_hat = torch.tensor(y_hat, dtype=torch.float32)
-            y_hat += self.boost_rate * train_regressor_pred
-            y_hat = self._clip_p(y_hat)
-            # TODO: Ergebnisse in Listen aktualisieren
-            # replace the weights in the list of original regressors
-            regressor.hidden_mat[i, i * self.n_hid: (i + 1) * self.n_hid] = new_regressor.hidden_mat.squeeze()
-            regressor.output_model.coef_[i * self.n_hid: (i + 1) * self.n_hid] = new_regressor.output_model.coef_
+    def retrain_feature(self, features_to_change, updated_data, X_train, y_train):
+        features_to_change_extended = []
+        updated_data_extended = {}
+        for feature in features_to_change:
+            # updated data durchlaufen und mit get_shape functions_as dict vergleichen, bei welchen Kategorien etwas geändert wurde
 
-    def update_model_with_spline(self, selected_features, updated_data, X_train, y_train):
+            if updated_data[feature]['datatype'] == "categorical":
+                # key = Embarked_Q, value = Embarked; key = Embarked_S, value = Embarked; feature = Embarked
+                for key, value in self.dummy_encodings.items():
+                    pref_feature_name, category = key.split('_')
+                    if value == feature:
+                        features_to_change_extended.append(key)
+                        # füge hier pro Kategorie ein Key-Value pair updated_data_extended hinzu
+                        feature_data = updated_data[feature]
+                        # Find the index of the category in the 'x' list
+                        if category in feature_data['x']:
+                            category_index = feature_data['x'].index(category)
+                            # Extract the corresponding value from the 'y' array
+                            y_value = feature_data['y'][category_index]
+                            updated_data_extended[key] = {
+                                'x': [1],
+                                'y': np.array([y_value]),
+                                'datatype': feature_data['datatype']
+                            }
+            else:
+                features_to_change_extended.append(feature)
+                updated_data_extended[feature] = updated_data[feature]
+
+        # change next line to updated_selected_features
+        for feature in features_to_change_extended:
+            # for categorical features only update the weight
+            i = self.feature_names.index(feature)
+            if updated_data_extended[feature]['datatype'] == 'categorical':
+                start_idx = self.n_numerical_cols * self.n_hid + (i - self.n_numerical_cols)
+                #print(self.regressors)
+                print(updated_data_extended[feature])
+
+                # self.output_model.coef_[start_idx: start_idx + 1]= x_in
+                #print(self.output_model.coef_[start_idx: start_idx + 1])
+                #continue
+
+            #print(feature)
+            #print(updated_data_extended[feature])
+            x = torch.tensor(updated_data_extended[feature]['x'], dtype=torch.float32)
+            #print(x)
+            y_hat = self.init_classifier.coef_[i] * x.numpy() + self.init_classifier.intercept_
+            # y = training targets, adjusted for certain x values
+            y = torch.tensor(updated_data_extended[feature]['y'], dtype=torch.float32) - y_hat
+            #print(y)
+            n_categorical_cols = 1 if updated_data_extended[feature]['datatype'] == 'categorical' else 0
+            for counter, regressor in enumerate(self.regressors):
+                hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
+                y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat)
+                new_regressor = ELM_Regressor(
+                    n_input=1,
+                    n_categorical_cols=n_categorical_cols,
+                    n_hid=self.n_hid,
+                    seed=counter,
+                    elm_scale=self.elm_scale,
+                    elm_alpha=self.elm_alpha,
+                    act=self.act,
+                    device=self.device,
+                )
+                X_hid = new_regressor.fit(
+                    x.reshape(-1, 1),
+                    y_tilde,
+                    torch.sqrt(torch.tensor(0.5).to(self.device))
+                    * self.boost_rate
+                    * hessian_train_sqrt[:, None],
+                )
+                # Make a prediction of the ELM for the update of y_hat
+                train_regressor_pred = new_regressor.predict(X_hid, hidden=True).squeeze()
+                # Update the prediction for training and validation data
+                y_hat = torch.tensor(y_hat, dtype=torch.float32)
+                y_hat += self.boost_rate * train_regressor_pred
+                y_hat = self._clip_p(y_hat)
+                # replace the weights in the list of original regressors
+                if updated_data_extended[feature]['datatype'] == 'numerical':
+                    regressor.hidden_mat[i, i * self.n_hid: (i + 1) * self.n_hid] = new_regressor.hidden_mat.squeeze()
+                regressor.output_model.coef_[i * self.n_hid: (i + 1) * self.n_hid] = new_regressor.output_model.coef_
+
+    def spline_interpolation(self, selected_features, updated_data, X_train, y_train):
         self.fit(X_train, y_train)
         # create cubic spline
         spline_functions = {}
