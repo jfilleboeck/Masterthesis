@@ -5,11 +5,15 @@ from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import mean_squared_error
 from scipy.interpolate import CubicSpline
 import torch
+from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import OneHotEncoder
+
 from data_preprocessing import load_and_preprocess_data
 from model_adapter import ModelAdapter
 
 # Load and split the data, determine if classification/regression
 X_train, X_val, y_train, y_val, task = load_and_preprocess_data(dataset='titanic')
+
 
 model = ModelAdapter(task)
 
@@ -346,15 +350,51 @@ def update_model():
 def load_data_grid_instances():
     data = request.json
     if data and data.get('type_of_data') == 'initial':
-        combined_data = pd.concat([X_val, y_val], axis=1)
+        combined_data = pd.concat([X_val.reset_index(drop=True), y_val.reset_index(drop=True)], axis=1)
         combined_data = combined_data.round(3)
         rows = combined_data.to_dict(orient='records')
-
         return jsonify(rows)
 
     return jsonify({'error': 'Invalid request'}), 400
 
 
+@app.route('/order_by_nearest', methods=['POST'])
+def order_by_nearest():
+    X_val.reset_index(drop=True, inplace=True)
+    y_val.reset_index(drop=True, inplace=True)
+    # Step 1: Identify categorical and numeric columns
+    categorical_features = X_val.select_dtypes(include=['object']).columns.tolist()
+    numeric_features = X_val.select_dtypes(exclude=['object']).columns.tolist()
+
+    # Step 2: One-Hot Encode categorical columns
+    encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
+    categorical_encoded = encoder.fit_transform(X_val[categorical_features])
+    categorical_encoded_df = pd.DataFrame(categorical_encoded,
+                                          columns=encoder.get_feature_names_out(categorical_features),
+                                          index=X_val.index)  # Retain original index
+
+    # Combine encoded categorical data with numeric data for nearest neighbor analysis
+    X_val_numeric = X_val[numeric_features]
+    X_val_preprocessed = pd.concat([X_val_numeric, categorical_encoded_df], axis=1)
+
+    # Step 3: Fit NearestNeighbors and calculate neighbors
+    nbrs = NearestNeighbors(n_neighbors=len(X_val_preprocessed)).fit(X_val_preprocessed)
+    distances, indices = nbrs.kneighbors(X_val_preprocessed)
+
+    # Reorder X_val and y_val based on the sorted indices of the nearest neighbors
+    sorted_indices = indices[:, 1]  # Assuming you want to sort based on the closest neighbor
+    # Use original index to ensure alignment
+    original_indices = X_val_preprocessed.index[sorted_indices]
+    sorted_data_original = X_val.loc[original_indices]
+
+    # Align y_val with the sorted X_val
+    sorted_y_val = y_val.loc[original_indices]
+
+    # Convert the sorted data to JSON, including y_val
+    sorted_data_original['target'] = sorted_y_val.values  # Direct assignment using values to avoid index misalignment
+    sorted_data_json = sorted_data_original.to_dict(orient='records')
+
+    return jsonify(sorted_data_json)
 
 if __name__ == '__main__':
     app.run(debug=True)

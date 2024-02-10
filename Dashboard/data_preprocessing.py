@@ -27,7 +27,6 @@ def load_and_preprocess_data(dataset='diabetes'):
         X = X.dropna(subset=['Embarked', 'Age'])
         # Update y to keep only the rows that are still in X
         y = y.loc[X.index]
-
         #
         X['Pclass'] = X['Pclass'].astype('object')
         X = X.drop(columns=['PassengerId', 'Name', 'Ticket', 'Cabin'])

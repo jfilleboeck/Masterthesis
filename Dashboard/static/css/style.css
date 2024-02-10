@@ -14,9 +14,12 @@
 }
 
 /*#histogram-plot {*/
-/*    height: 200px; !* Adjust this value as needed *!*/
+/*    height: 200px;
 /*}*/
 
+.highlighted-row {
+    background-color: #f0f0f0;
+}
 
 #dynamic-table thead th {
     position: sticky;

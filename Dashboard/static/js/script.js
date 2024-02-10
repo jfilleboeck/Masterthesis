@@ -375,10 +375,19 @@ function generateColumns(data) {
 function createTable(data) {
     var table = new Tabulator("#datagrid-table", {
         data: data,
-        layout: "fitColumns", //fit columns to width of table
+        layout: "fitColumns",
         columns: generateColumns(data),
+        rowClick: function(e, row) {
+            // Remove highlight class from all rows
+            table.getRows().forEach(function(r) {
+                r.getElement().classList.remove("highlighted-row");
+            });
+            // Add highlight class to the clicked row
+            row.getElement().classList.add("highlighted-row");
+        },
     });
 }
+
 
 function fetchDataAndCreateTable() {
     fetch('/load_data_grid_instances', {
@@ -398,4 +407,23 @@ function fetchDataAndCreateTable() {
     .catch(error => console.error('Error:', error));
 }
 
+function orderByNearest() {
+    fetch('/order_by_nearest', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => createTable(data))
+    .catch(error => console.error('Error:', error));
+}
+
+document.getElementById('order-nearest').addEventListener('click', orderByNearest);
 

@@ -10,7 +10,8 @@ if __name__ == "__main__":
     print("Running main script")
 
     # Load and split the data
-    X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
+    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
+    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
     adapter = ModelAdapter(task)
     adapter.fit(X_train, y_train)
 
@@ -27,13 +28,14 @@ if __name__ == "__main__":
     #     os.makedirs(plot_dir)
     #
     # # List of features to iterate
-    #features_to_change = ['age', 'bmi', 'bp']
-    features_to_change = ['sex']
+    #features_to_change = ['bmi', 'bp']
+    features_to_change = ['Age']
 
     # Load feature data
     shape_functions_dict = adapter.model.get_shape_functions_as_dict()
-    adapter.plot_single(plot_by_list=['age', 'bmi', 'bp', 'sex', 's1', 's2'])
-
+    #adapter.plot_single(plot_by_list=['age', 'bmi', 'bp', 'sex', 's1', 's2'])
+    adapter.plot_single(plot_by_list=['Age'])
+    #adapter.plot_single(plot_by_list=['bmi', 'bp'])
     # this part is already given in the flask application
     feature_current_state = {}
     for feature in shape_functions_dict:
@@ -52,7 +54,8 @@ if __name__ == "__main__":
             if feature["datatype"] == "categorical":
                 y_values = np.array(feature_current_state[name])
             else:
-                y_values = np.where(np.array(feature_current_state[name]) < 0, 0, feature_current_state[name])
+                y_values = np.where(np.array(feature_current_state[name]) > 0, 0, feature_current_state[name])
+                #y_values = feature_current_state[name]
         else:
             # Use the original 'y' values from shape_functions_dict if there is no user change
             y_values = feature['y']
@@ -61,6 +64,7 @@ if __name__ == "__main__":
             updated_data[name] = {'x': x_values, 'y': y_values.tolist(), 'datatype': 'numerical'}
         else:
             updated_data[name] = {'x': x_values, 'y': np.array([-0.5]), 'datatype': 'categorical'}
+
     # ändern, wenn es in Wesite Code kommt: Nur die Änderungen von features_to_change in feature_current_state übernehmen
     # updated_data == feature-current_state; anpassen für kategorische Werte
     # Als erstes möchte ich eine Liste von features to change übergeben
@@ -72,7 +76,10 @@ if __name__ == "__main__":
     mse_train = mean_squared_error(y_train, y_train_pred)
     mse_test = mean_squared_error(y_test, y_test_pred)
     print(f"MSE Train: {mse_train}, MSE Test: {mse_test}")
-    adapter.plot_single(plot_by_list=['age', 'bmi', 'bp', 'sex', 's1', 's2'])
+    #adapter.plot_single(plot_by_list=['age', 'bmi', 'bp', 'sex', 's1', 's2'])
+    adapter.plot_single(plot_by_list=['Age'])
+    #adapter.plot_single(plot_by_list=['bmi', 'bp'])
+
 
     # selected_features = features_to_change
     #for feature in features_to_change:

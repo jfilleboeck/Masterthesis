@@ -10,8 +10,8 @@ if __name__ == "__main__":
     print("Running main script")
 
     # Load and split the data
-    X_train, X_test, y_train, y_test = load_and_preprocess_data()
-    model = ModelAdapter()
+    X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
+    model = ModelAdapter(task)
     model.fit(X_train, y_train)
 
     # Create a directory for plots
@@ -45,13 +45,13 @@ if __name__ == "__main__":
         plt.close()
 
         # Update and re-optimize the model
-        model = ModelAdapter()
+        model = ModelAdapter(task)
         model.fit(X_train, y_train)
-        model = model.adapt(selected_features=selected_features, updated_data=updated_data, X_train=X_train, y_train=y_train, method="spline")
+        model = model.adapt(features_to_change=selected_features, updated_data=updated_data, X_train=X_train, y_train=y_train, method="spline")
 
         # Plot and save the model's new predictions
         model.plot_single(plot_by_list=['age', 'bmi', 'bp', 's1', 's2'])
-        plt.savefig(os.path.join(plot_dir, f"{feature_to_change}_model_plot.png"))
+        #plt.savefig(os.path.join(plot_dir, f"{feature_to_change}_model_plot.png"))
         plt.close()
 
         # Calculate and print mean squared error
