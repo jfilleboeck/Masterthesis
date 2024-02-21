@@ -1,7 +1,13 @@
 import pandas as pd
+import numpy as np
 from sklearn.datasets import load_diabetes
 from sklearn.model_selection import train_test_split
+from sklearn.datasets import load_iris
 from sklearn.preprocessing import StandardScaler
+from sklearn.datasets import fetch_openml
+from sklearn.impute import SimpleImputer
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 import os
 
 def load_and_preprocess_data(dataset='diabetes'):
@@ -15,6 +21,54 @@ def load_and_preprocess_data(dataset='diabetes'):
         task = 'regression'
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         return X_train, X_test, y_train, y_test, task
+
+    if dataset == 'adult':
+        adult = fetch_openml(name='adult', version=2)
+        X, y = adult.data, adult.target
+
+        # Remove rows with empty values
+        X.dropna()
+        # Update y to keep only the rows that are still in X
+        y = y.loc[X.index]
+
+        numerical_features = ['age', 'fnlwgt', 'education-num', 'capital-gain', 'capital-loss', 'hours-per-week']
+        X_numeric = X[numerical_features]
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X_numeric)
+        X_scaled = pd.DataFrame(X_scaled, columns=X_numeric.columns)
+        X_scaled = pd.DataFrame(X_scaled, columns=X_numeric.columns,
+                                index=X_numeric.index)  # Preserve the original index
+
+        categorical_features = [feature for feature in adult.feature_names if feature not in numerical_features]
+        X_categorical = X.loc[:, categorical_features].astype('object')
+
+        # Convert the datatypes of categorical features to 'object'
+        #X_categorical = X_categorical.astype('object')
+
+        X = pd.concat([X_scaled, X_categorical], axis=1)
+        y_mapped = y.map({'>50K': 1, '<=50K': 0})
+
+
+        X_train, X_test, y_train, y_test = train_test_split(X, np.array(y_mapped), test_size=0.2, random_state=42)
+        task = "classification"
+
+        return X_train, X_test, y_train, y_test, task
+
+
+    if dataset == 'iris':
+        iris = load_iris()
+        X, y = iris.data, iris.target
+        # Filter the dataset to include only Iris-setosa and Iris-versicolor
+        mask = (y == 0) | (y == 1)
+        X_binary = X[mask]
+        y_binary = y[mask]
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X_binary)
+        X = pd.DataFrame(X_scaled, columns=iris.feature_names)
+        task = 'classification'
+        X_train, X_test, y_train, y_test = train_test_split(X, y_binary, test_size=0.2, random_state=42)
+        return X_train, X_test, y_train, y_test, task
+
 
     if dataset == 'titanic':
         # Ensure that the dataset can be accessed from various scripts

@@ -29,12 +29,12 @@ if __name__ == "__main__":
     #
     # # List of features to iterate
     #features_to_change = ['bmi', 'bp']
-    features_to_change = ['Age']
+    features_to_change = ['Age', 'Members', 'Fare']
 
     # Load feature data
     shape_functions_dict = adapter.model.get_shape_functions_as_dict()
     #adapter.plot_single(plot_by_list=['age', 'bmi', 'bp', 'sex', 's1', 's2'])
-    adapter.plot_single(plot_by_list=['Age'])
+    adapter.plot_single(plot_by_list=['Age', 'Members', 'Fare'])
     #adapter.plot_single(plot_by_list=['bmi', 'bp'])
     # this part is already given in the flask application
     feature_current_state = {}
@@ -54,8 +54,10 @@ if __name__ == "__main__":
             if feature["datatype"] == "categorical":
                 y_values = np.array(feature_current_state[name])
             else:
-                y_values = np.where(np.array(feature_current_state[name]) > 0, 0, feature_current_state[name])
+                y_values = np.where(np.array(feature_current_state[name]) > 0, -0.2, feature_current_state[name])
                 #y_values = feature_current_state[name]
+                print(feature['name'])
+                print(y_values)
         else:
             # Use the original 'y' values from shape_functions_dict if there is no user change
             y_values = feature['y']
@@ -64,6 +66,7 @@ if __name__ == "__main__":
             updated_data[name] = {'x': x_values, 'y': y_values.tolist(), 'datatype': 'numerical'}
         else:
             updated_data[name] = {'x': x_values, 'y': np.array([-0.5]), 'datatype': 'categorical'}
+
 
     # ändern, wenn es in Wesite Code kommt: Nur die Änderungen von features_to_change in feature_current_state übernehmen
     # updated_data == feature-current_state; anpassen für kategorische Werte
@@ -77,7 +80,7 @@ if __name__ == "__main__":
     mse_test = mean_squared_error(y_test, y_test_pred)
     print(f"MSE Train: {mse_train}, MSE Test: {mse_test}")
     #adapter.plot_single(plot_by_list=['age', 'bmi', 'bp', 'sex', 's1', 's2'])
-    adapter.plot_single(plot_by_list=['Age'])
+    adapter.plot_single(plot_by_list=['Age', 'Members', 'Fare'])
     #adapter.plot_single(plot_by_list=['bmi', 'bp'])
 
 

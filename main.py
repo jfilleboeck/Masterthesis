@@ -22,11 +22,16 @@ if __name__ == "__main__":
     print("Running main script")
 
 # Load and split the data
-X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
+X_train, X_test, y_train, y_test, task = load_and_preprocess_data("adult")
 
 model = IGANN(task)
 #model = IGANN(task='regression')
 model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+#mse = mean_squared_error(y_test, y_pred)
+print(mse)
+f1_test = f1_score(y_test, y_pred, average='weighted')
+model.plot_single(show_n=8)
 #model.plot_single(plot_by_list=['age', 'bmi', 'bp', 'sex', 's1', 's2'])
 
 x = torch.tensor([-2.0177, -2.0005, -1.9949, -1.9894, -1.9832, -1.9777, -1.9086, -1.8396,
@@ -44,7 +49,7 @@ x = torch.tensor([-2.0177, -2.0005, -1.9949, -1.9894, -1.9832, -1.9777, -1.9086,
 i = 0
 y_hat_adapter = torch.tensor([3.54903812, 3.54095055, 3.53836257, 3.53577448, 3.53286297, 3.530275,3.4979247, 3.46557451, 3.43322421, 3.40087397, 3.36852373, 3.33617349, 3.30382319, 3.27147294, 3.2391227, 3.2067724, 3.17442222, 3.14207191, 3.10972167, 3.09354652, 3.0773714, 3.04502119, 3.01267092, 2.98032067,2.9479704, 2.91562016, 2.89944501, 2.88326992, 2.85091963, 2.81856939,2.80239427, 2.78621913, 2.75386887, 2.72151863, 2.68916837, 2.65681812,2.64064299, 2.62446786, 2.59211761, 2.57594248, 2.55976736, 2.52741711, 2.51124198, 2.49506685, 2.46271659, 2.43036633, 2.39801608, 2.36566584,2.33331556, 2.30096532, 2.26861508, 2.25243993, 2.23626481, 2.20391456,2.17156432, 2.13921405, 2.10686381, 2.09068866, 2.07451351, 2.04216332, 2.00981302, 1.97746278, 1.94511248, 1.9127623, 1.88041199, 1.81571151, 1.78336127, 1.76718612, 1.75101097, 1.71866078, 1.68631048, 1.65396024, 1.62160994, 1.58925964, 1.55690945, 1.52455927, 1.49220897, 1.45985867, 1.42750837, 1.2981074, 1.26575722, 1.16870631, 0.97460486])
 
-y_hat_new = model.init_classifier.coef_[0, i] * x.numpy() + model.init_classifier.intercept_
+#y_hat_new = model.init_classifier.coef_[0, i] * x.numpy() + model.init_classifier.intercept_
 
 #print(y_hat_new)
 
@@ -78,7 +83,7 @@ initial_feature_values = [
 
 # Sorting the list from low to high
 sorted_numbers = pd.Series(sorted(initial_feature_values))
-initial_y_hat = pd.Series(model.init_classifier.coef_[0, i] * np.array(sorted(initial_feature_values))+ model.init_classifier.intercept_)
+#initial_y_hat = pd.Series(model.init_classifier.coef_[0, i] * np.array(sorted(initial_feature_values))+ model.init_classifier.intercept_)
 
 
 
