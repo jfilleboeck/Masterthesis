@@ -2,17 +2,17 @@ from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import numpy as np
 from sklearn.isotonic import IsotonicRegression
-from sklearn.metrics import mean_squared_error
 from scipy.interpolate import CubicSpline
 import torch
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.metrics import mean_squared_error, f1_score
 
 from data_preprocessing import load_and_preprocess_data
 from model_adapter import ModelAdapter
 
 # Load and split the data, determine if classification/regression
-X_train, X_val, y_train, y_val, task = load_and_preprocess_data(dataset='titanic')
+X_train, X_val, y_train, y_val, task = load_and_preprocess_data("titanic")
 
 
 model = ModelAdapter(task)
@@ -254,17 +254,23 @@ def cubic_spline_interpolate():
     return jsonify({'x': x_data, 'y': ynew.tolist()})
 
 
-@app.route('/predict_and_get_mse', methods=['GET'])
-def predict_and_get_mse():
-    # Use the global model to predict and calculate MSE
+@app.route('/predict_and_get_metrics', methods=['GET'])
+def predict_and_get_metrics():
+    # Example model predictions and task definition
+    # These should be replaced with your actual model predictions and task determination logic
     y_train_pred = model.predict(X_train)
     y_val_pred = model.predict(X_val)
 
-    mse_train = mean_squared_error(y_train, y_train_pred)
-    mse_val = mean_squared_error(y_val, y_val_pred)
+    if task == "regression":
+        train_score = mean_squared_error(y_train, y_train_pred)
+        val_score = mean_squared_error(y_val, y_val_pred)
+    else:
+        train_score = f1_score(y_train, y_train_pred, average='weighted')
+        val_score = f1_score(y_val, y_val_pred, average='weighted')
 
-    # Return the MSE values as JSON
-    return jsonify({'mse_train': mse_train, 'mse_val': mse_val})
+    # Ensure the key names match what your frontend expects
+    return jsonify({'train_score': train_score, 'val_score': val_score, 'task': task})
+
 
 
 @app.route('/get_original_data', methods=['POST'])

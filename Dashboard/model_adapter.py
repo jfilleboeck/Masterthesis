@@ -205,25 +205,25 @@ class IGANNAdapter(IGANN):
             new_regressors.append(new_regressor)
         self.regressors = new_regressors
 
-    # def _get_pred_of_i(self, i, x_values=None):
-    #     if x_values == None:
-    #         feat_values = self.unique[i]
-    #     else:
-    #         feat_values = x_values[i]
-    #     if self.task == "classification":
-    #         pred = self.init_classifier.coef_[0, i] * feat_values
-    #     else:
-    #         pred = self.init_classifier.coef_[i] * feat_values
-    #     feat_values = feat_values.to(self.device)
-    #     if self.task == "classification":
-    #         if self.spline_interpolation_run == True:
-    #             pred = torch.zeros_like(pred)
-    #     for regressor, boost_rate in zip(self.regressors, self.boosting_rates):
-    #         pred += (
-    #             boost_rate
-    #             * regressor.predict_single(feat_values.reshape(-1, 1), i).squeeze()
-    #         ).cpu()
-    #     return feat_values, pred
+    def _get_pred_of_i(self, i, x_values=None):
+        if x_values == None:
+            feat_values = self.unique[i]
+        else:
+            feat_values = x_values[i]
+        if self.task == "classification":
+            pred = self.init_classifier.coef_[0, i] * feat_values
+        else:
+            pred = self.init_classifier.coef_[i] * feat_values
+        feat_values = feat_values.to(self.device)
+        if self.task == "classification":
+            if self.spline_interpolation_run == True:
+                pred = torch.zeros_like(pred)
+        for regressor, boost_rate in zip(self.regressors, self.boosting_rates):
+            pred += (
+                boost_rate
+                * regressor.predict_single(feat_values.reshape(-1, 1), i).squeeze()
+            ).cpu()
+        return feat_values, pred
 
 
 

@@ -8,6 +8,7 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <script type="text/javascript">
+        var feature_names = {{ feature_names|tojson}};
         var xData = {{ x_data|tojson }};
         var yData = {{ y_data|tojson }};
         var isNumericFeature = {{ is_numeric_feature|tojson }};
@@ -33,9 +34,40 @@
         <!-- Column for the histogram -->
         <div class="col-md-4">
             <div id="histogram-plot"></div>
+            <p style="margin-bottom: 10px;"><b>Incorporate multiple features into model:</b></p>
             <form class="form-inline" style="margin-bottom: 20px;">
-                <button class="btn btn-success mr-2" onclick="predictAndGetMSE(); return false;">Get MSE</button>
-                <div id="mse-output" class="btn btn-success mr-2" style="margin-right: 8px";>Calculating MSE...</div>
+            <div id="feature-list" class="list-group">
+                {% for item in feature_names %}
+                <a href="#" class="list-group-item list-group-item-action" data-value="{{ item }}">{{ item }}</a>
+                {% endfor %}
+            </div>
+            <script>
+                var selectedFeatures = []; // This will hold the selected feature names
+                document.querySelectorAll('#feature-list .list-group-item').forEach(item => {
+                    item.addEventListener('click', function(e) {
+                        e.preventDefault(); // Prevent default link behavior
+
+                        var featureValue = this.getAttribute('data-value');
+                        var featureIndex = selectedFeatures.indexOf(featureValue);
+
+                        if(featureIndex > -1) {
+                            // If feature is already selected, remove it
+                            selectedFeatures.splice(featureIndex, 1);
+                            this.classList.remove('active'); // Remove highlighting
+                        } else {
+                            // If feature is not selected, add it
+                            selectedFeatures.push(featureValue);
+                            this.classList.add('active'); // Add highlighting
+                        }
+
+                        console.log('Selected Features:', selectedFeatures); // Log the selected features to the console
+                    });
+                });
+            </script>
+                <div class="button-container" style="display: flex; flex-direction: column;">
+                    <button class="btn btn-info mb-2" onclick="performCubicSplineInterpolation(); return false;">Splines</button>
+                    <button class="btn btn-info" onclick="retrainFeature(); return false;">Retrain Feature</button>
+                </div>
             </form>
         </div>
 
@@ -52,9 +84,8 @@
         </form>
         <p style="margin-bottom: 10px;"><b>Incorporate into model:</b></p>
         <form class="form-inline">
-            <button class="btn btn-info mr-2" onclick="performCubicSplineInterpolation(); return false;">Cubic Spline Interpolation</button>
-            <button class="btn btn-info mr-2" onclick="updateModel(); return false;">Update Model (Splines)</button>
-            <button class="btn btn-info mr-2" onclick="retrainFeature(); return false;">Retrain Feature</button>
+                <button class="btn btn-success mr-2" onclick="predictAndGetMetrics(); return false;">Get Metrics</button>
+                <div id="metric-output" class="btn btn-success mr-2" style="margin-right: 8px";>Calculating Metrics...</div>
             <button class="btn btn-danger" style="margin-right: 8px" onclick="resetGraph(); return false;">Reset</button>
             <button class="btn btn-secondary mr-2" onclick="undoLastChange(); return false;">Undo</button>
         </form>

@@ -37,3 +37,28 @@
 #dynamic-table {
     table-layout: auto;
 }
+
+
+#feature-list {
+    max-height: 150px; /* Adjust this value based on your needs */
+    overflow-y: auto; /* Enables vertical scrolling */
+    margin-bottom: 10px; /* Optional: Adds some space below the list */
+    margin-right: 25px; /* Increase horizontal space */
+    width: 50%;
+}
+
+.list-group-item.active {
+    background-color: #007bff; /* Bootstrap primary color */
+    color: white;
+}
+
+#feature-list .list-group-item {
+    padding: 5px 15px; /* Adjust the padding as needed */
+    margin-bottom: 2px; /* Optional: Adds a small space between items */
+}
+
+.button-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* Adjust gap between buttons if needed */
+}

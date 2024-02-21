@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', function() {
         selectedFeature = selectBox.value;
         fetchFeatureData(selectedFeature);
     });
-    predictAndGetMSE();
+    predictAndGetMetrics();
     //fetchFeatureData(selectBox.value);
     fetchDataAndCreateTable();
 });
@@ -273,25 +273,28 @@ function retrainFeature() {
 }
 
 
-function predictAndGetMSE() {
-    fetch('/predict_and_get_mse')
+function predictAndGetMetrics() {
+    fetch('/predict_and_get_metrics')
     .then(response => response.json())
     .then(data => {
-        // Create the MSE output content
-        let mseOutputContent = 'MSE Training: ' + data.mse_train.toFixed(2) +
-                               '<br>MSE Validation: ' + data.mse_val.toFixed(2);
-
-        // Set the content to the mse-output div and show it
-        let mseOutputDiv = document.getElementById('mse-output');
-        mseOutputDiv.innerHTML = mseOutputContent;
-        mseOutputDiv.style.display = 'block';
+        let outputContent;
+        if (data.task === "regression") {
+            outputContent = 'MSE Training: ' + data.train_score.toFixed(2) +
+                            '<br>MSE Validation: ' + data.val_score.toFixed(2);
+        } else if (data.task === "classification") {
+            outputContent = 'F1 Score Training: ' + data.train_score.toFixed(2) +
+                            '<br>F1 Score Validation: ' + data.val_score.toFixed(2);
+        }
+        let OutputDiv = document.getElementById('metric-output');
+        OutputDiv.innerHTML = outputContent;
+        OutputDiv.style.display = 'block';
     })
     .catch(error => {
-        // If there's an error, display it in the mse-output div
-        let mseOutputDiv = document.getElementById('mse-output');
-        mseOutputDiv.className = 'alert alert-danger';
-        mseOutputDiv.innerHTML = 'Error: ' + error;
-        mseOutputDiv.style.display = 'block';
+        // If there's an error, display it in the output div
+        let OutputDiv = document.getElementById('metric-output');
+        OutputDiv.className = 'alert alert-danger';
+        OutputDiv.innerHTML = 'Error: ' + error;
+        OutputDiv.style.display = 'block';
     });
 }
 
@@ -325,27 +328,6 @@ function undoLastChange() {
             Plotly.update('plot', {y: [data.y]});
         }
     });
-}
-
-function updateModel() {
-    fetch('/update_model', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({selected_feature: selectedFeature})
-    })
-    .then(response => response.json())
-    .then(data => {
-        // Create the MSE output content
-        let mseOutputContent = 'Mean Squared Error on Training Set: ' + data.mse_train.toFixed(2) +
-                               '<br>Mean Squared Error on Testing Set: ' + data.mse_test.toFixed(2);
-
-        // Set the content to the mse-output div and show it
-        let mseOutputDiv = document.getElementById('mse-output');
-        mseOutputDiv.innerHTML = mseOutputContent;
-        mseOutputDiv.style.display = 'block';
-    })
 }
 
 
