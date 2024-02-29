@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from igann.igann import ELM_Regressor
 from scipy.interpolate import CubicSpline
+from matplotlib import pyplot as plt
 
 
 class ModelAdapter():
@@ -66,7 +67,7 @@ class IGANNAdapter(IGANN):
         updated_data_extended = {}
         for feature in features_to_change:
             # updated data durchlaufen und mit get_shape functions_as dict vergleichen, bei welchen Kategorien etwas geändert wurde
-
+            test_variable = updated_data[feature]
             if updated_data[feature]['datatype'] == "categorical":
                 # key = Embarked_Q, value = Embarked; key = Embarked_S, value = Embarked; feature = Embarked
                 for key, value in self.dummy_encodings.items():
@@ -96,34 +97,46 @@ class IGANNAdapter(IGANN):
         for feature in features_to_change:
             i = self.feature_names.index(feature)
             x = torch.tensor(updated_data[feature]['x'], dtype=torch.float32)
+            #print(feature)
+            #print(x.shape)
+            y = torch.tensor(updated_data[feature]['y'], dtype=torch.float32)
+            # Initialize lists to store the first values for plotting
+            y_first_values = []
+            train_regressor_pred_first_values = []
+            y_hat_first_values = []
+            y_tilde_first_values = []
             if self.task == "classification":
                 y_hat = self.init_classifier.coef_[0, i] * x.numpy() + self.init_classifier.intercept_
-                y = torch.tensor(updated_data[feature]['y'], dtype=torch.float64)
             else:
                 y_hat = self.init_classifier.coef_[i] * x.numpy() + self.init_classifier.intercept_
-                y = torch.tensor(updated_data[feature]['y'], dtype=torch.float32)
+            #print(y)
+            print(y_hat)
             #self.task = "regression"
+            #y_hat = np.zeros_like(y_hat)
             n_categorical_cols = 1 if updated_data[feature]['datatype'] == 'categorical' else 0
             for counter, regressor in enumerate(self.regressors):
+                    # Store the first value of each tensor for plotting
+                y_first_values.append(y[0].item())
+                y_hat_first_values.append(y_hat[0])
                 if updated_data[feature]['datatype'] == 'numerical':
                     if self.task == "classification":
                         self.task = "regression"
-                        hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
                         y_tilde = (torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat)).to(
-                            dtype=torch.float32)
+                            dtype=torch.float64)
+                        #y_tilde = torch.sqrt(torch.tensor(0.5)) * (torch.tensor((y - y_hat), dtype=torch.float64))
                         self.task = "classification"
                     else:
-                         hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
                          y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat).to(dtype=torch.float32)
-                    #y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat)
-                    #y_tilde = (y - y_hat).to(dtype=torch.float32)
+                    hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
+                    # y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat).to(
+                    #     dtype=torch.float64)
                     new_regressor = ELM_Regressor(
                         n_input=1,
                         n_categorical_cols=n_categorical_cols,
                         n_hid=self.n_hid,
-                        seed=counter,
+                        seed=42,
                         elm_scale=self.elm_scale,
-                        elm_alpha=self.elm_alpha,
+                        elm_alpha=0.001,
                         act=self.act,
                         device=self.device,
                     )
@@ -137,11 +150,15 @@ class IGANNAdapter(IGANN):
                     )
                     # Make a prediction of the ELM for the update of y_hat
                     if self.task == "classification":
-                        train_regressor_pred = new_regressor.predict(X_hid.to(dtype=torch.float32), hidden=True).squeeze()
+                        train_regressor_pred = new_regressor.predict(X_hid.to(dtype=torch.float64), hidden=True).squeeze()
                     else:
                         train_regressor_pred = new_regressor.predict(X_hid, hidden=True).squeeze()
+
+                    train_regressor_pred_first_values.append(train_regressor_pred[0].item())
+                    y_tilde_first_values.append(y_tilde[0].item())
+
                     # Update the prediction for training and validation data
-                    y_hat = torch.tensor(y_hat, dtype=torch.float32)
+                    y_hat = torch.tensor(y_hat, dtype=torch.float64)
                     y_hat += self.boost_rate * train_regressor_pred
                     y_hat = self._clip_p(y_hat)
                     # replace the weights in the list of original regressors
@@ -153,6 +170,22 @@ class IGANNAdapter(IGANN):
                     # train_regressor_pred = torch.from_numpy(y) * X[:, i]
                     new_weight = y / len(self.regressors) * (1 / self.boosting_rates[counter])
                     regressor.output_model.coef_[i * self.n_hid: (i + 1) * self.n_hid] = new_weight
+
+            if len(y_first_values) > 0:  # Ensure there's data to plot
+                plt.figure(figsize=(10, 6))
+                plt.scatter(range(len(y_first_values)), y_first_values, label='y', color='blue')
+                plt.scatter(range(len(train_regressor_pred_first_values)), train_regressor_pred_first_values,
+                            label='train_regressor_pred', color='red')
+                plt.scatter(range(len(y_hat_first_values)), y_hat_first_values, label='y_hat (before update)',
+                            color='green')
+                plt.scatter(range(len(y_tilde_first_values)), y_tilde_first_values, label='y_tilde', color='orange')
+
+                plt.title('First Value Comparison for First 8 Iterations')
+                plt.xlabel('Iteration')
+                plt.ylabel('Value')
+                plt.legend()
+                plt.grid(True)
+                plt.show()
 
     def spline_interpolation(self, features_to_change, updated_data, X_train, y_train):
         self.spline_interpolation_run = True
@@ -172,10 +205,6 @@ class IGANNAdapter(IGANN):
             spline_functions[feature_index] = spline
             features_selected_i.append(feature_index)
             # Required to adjust the predict_single method
-
-
-
-
         # Copy ELM Regressor
         new_regressors = []
         # Create custom Regressor

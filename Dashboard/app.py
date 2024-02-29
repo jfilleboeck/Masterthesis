@@ -12,7 +12,7 @@ from data_preprocessing import load_and_preprocess_data
 from model_adapter import ModelAdapter
 
 # Load and split the data, determine if classification/regression
-X_train, X_val, y_train, y_val, task = load_and_preprocess_data("titanic")
+X_train, X_val, y_train, y_val, task = load_and_preprocess_data()
 
 
 model = ModelAdapter(task)
@@ -240,18 +240,36 @@ def monotonic_decrease():
 @app.route('/cubic_spline_interpolate', methods=['POST'])
 def cubic_spline_interpolate():
     data = request.json
+    # change name of selectedFeatures into features_to_incorporate
+    selectedFeatures = data['selectedFeatures']
     selected_feature = data['selected_feature']
+    updated_data = {}
+    for feature in shape_functions_dict:
+        name = feature['name']
+        x_values = feature['x']
+        if name in selectedFeatures:
+            y_values = np.array(feature_current_state[name])
+        else:
+            y_values = np.array(shape_functions_dict[name]['y'])
+    #feature_data_dict = next(item for item in shape_functions_dict if item['name'] == selected_feature)
+        if feature['datatype'] == 'numerical':
+            updated_data[name] = {'x': x_values, 'y': y_values.tolist(), 'datatype': 'numerical'}
+        else:
+            updated_data[name] = {'x': x_values, 'y': y_values, 'datatype': 'categorical'}
+    #x_data = feature_data_dict['x'].tolist()
+    #y_data = feature_current_state[selected_feature].tolist()
+    adapter = model.adapt(selectedFeatures, updated_data, "spline", X_train, y_train)
+    replace_model(adapter)
+    #
+    x_data = shape_functions_dict[selected_feature]['x']
+    y_data = shape_functions_dict[selected_feature]['y']
+    return jsonify({'x': x_data, 'y': y_data.tolist()})
+def replace_model(new_model):
+    model = new_model
+    global shape_functions_dict
+    shape_functions_dict = model.get_shape_functions_as_dict()
 
-    feature_data_dict = next(item for item in shape_functions_dict if item['name'] == selected_feature)
-    x_data = feature_data_dict['x'].tolist()
-    y_data = feature_current_state[selected_feature].tolist()
 
-    cs = CubicSpline(x_data, y_data)
-    ynew = cs(x_data)
-
-    feature_spline_state[selected_feature] = ynew.tolist()
-
-    return jsonify({'x': x_data, 'y': ynew.tolist()})
 
 
 @app.route('/predict_and_get_metrics', methods=['GET'])
@@ -281,7 +299,7 @@ def get_original_data():
     selected_feature = data['selected_feature']
 
     # Obtain the original data for the selected feature
-    model = ModelAdapter()
+    model = ModelAdapter(task)
     model.fit(X_train, y_train)
     original_data = next(item for item in model.get_shape_functions_as_dict() if item['name'] == selected_feature)
     original_y = original_data['y']

@@ -228,7 +228,7 @@ function setMonotonicDecrease() {
     });
 }
 
-function performCubicSplineInterpolation() {
+function CubicSplineInterpolation(selectedFeatures) {
     const selectedFeature = document.getElementById('feature-select').value;
 
     fetch('/cubic_spline_interpolate', {
@@ -236,7 +236,7 @@ function performCubicSplineInterpolation() {
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ selected_feature: selectedFeature })
+        body: JSON.stringify({ selectedFeature: selectedFeature, selectedFeatures: selectedFeatures })
     })
     .then(response => response.json())
     .then(data => {

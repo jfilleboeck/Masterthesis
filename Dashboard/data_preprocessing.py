@@ -9,6 +9,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 import os
+from ucimlrepo import fetch_ucirepo
+
 
 def load_and_preprocess_data(dataset='diabetes'):
     if dataset == 'diabetes':
@@ -22,6 +24,39 @@ def load_and_preprocess_data(dataset='diabetes'):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         return X_train, X_test, y_train, y_test, task
 
+
+    if dataset == 'bike':
+        bike_sharing_dataset = fetch_ucirepo(id=275)
+
+        # data (as pandas dataframes)
+        X = bike_sharing_dataset.data.features
+        y = bike_sharing_dataset.data.targets
+        X.dropna()
+        # Update y to keep only the rows that are still in X
+        y = y.loc[X.index]
+        y = (y - y.mean()) / y.std()
+        numerical_features = ['temp', 'atemp', 'hum', 'windspeed']
+
+        X_numeric = X[numerical_features]
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X_numeric)
+        X_scaled = pd.DataFrame(X_scaled, columns=X_numeric.columns)
+        X_scaled = pd.DataFrame(X_scaled, columns=X_numeric.columns,
+                                index=X_numeric.index)  # Preserve the original index
+
+        categorical_features = [feature for feature in X if feature not in numerical_features]
+        X_categorical = X.loc[:, categorical_features].astype('object')
+
+        # Convert the datatypes of categorical features to 'object'
+        #X_categorical = X_categorical.astype('object')
+
+        X = pd.concat([X_scaled, X_categorical], axis=1)
+
+        X_train, X_test, y_train, y_test = train_test_split(X, np.array(y), test_size=0.2, random_state=42)
+        task = "regression"
+
+        return X_train, X_test, y_train, y_test, task
+
     if dataset == 'adult':
         adult = fetch_openml(name='adult', version=2)
         X, y = adult.data, adult.target
@@ -31,13 +66,16 @@ def load_and_preprocess_data(dataset='diabetes'):
         # Update y to keep only the rows that are still in X
         y = y.loc[X.index]
 
+        X = X.drop(columns=['instant', 'dteday'])
+
+
         numerical_features = ['age', 'fnlwgt', 'education-num', 'capital-gain', 'capital-loss', 'hours-per-week']
         X_numeric = X[numerical_features]
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X_numeric)
         X_scaled = pd.DataFrame(X_scaled, columns=X_numeric.columns)
         X_scaled = pd.DataFrame(X_scaled, columns=X_numeric.columns,
-                                index=X_numeric.index)  # Preserve the original index
+                                index=X_numeric.index)
 
         categorical_features = [feature for feature in adult.feature_names if feature not in numerical_features]
         X_categorical = X.loc[:, categorical_features].astype('object')
@@ -46,11 +84,13 @@ def load_and_preprocess_data(dataset='diabetes'):
         #X_categorical = X_categorical.astype('object')
 
         X = pd.concat([X_scaled, X_categorical], axis=1)
+
         y_mapped = y.map({'>50K': 1, '<=50K': 0})
 
-
         X_train, X_test, y_train, y_test = train_test_split(X, np.array(y_mapped), test_size=0.2, random_state=42)
+
         task = "classification"
+
 
         return X_train, X_test, y_train, y_test, task
 
