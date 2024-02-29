@@ -110,7 +110,6 @@ class IGANNAdapter(IGANN):
             else:
                 y_hat = self.init_classifier.coef_[i] * x.numpy() + self.init_classifier.intercept_
             #print(y)
-            print(y_hat)
             #self.task = "regression"
             #y_hat = np.zeros_like(y_hat)
             n_categorical_cols = 1 if updated_data[feature]['datatype'] == 'categorical' else 0
@@ -118,12 +117,13 @@ class IGANNAdapter(IGANN):
                     # Store the first value of each tensor for plotting
                 y_first_values.append(y[0].item())
                 y_hat_first_values.append(y_hat[0])
+
                 if updated_data[feature]['datatype'] == 'numerical':
                     if self.task == "classification":
-                        self.task = "regression"
-                        y_tilde = (torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat)).to(
-                            dtype=torch.float64)
-                        #y_tilde = torch.sqrt(torch.tensor(0.5)) * (torch.tensor((y - y_hat), dtype=torch.float64))
+                        #self.task = "regression"
+                        #y_tilde = (torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat)).to(
+                        #    dtype=torch.float64)
+                        y_tilde = torch.sqrt(torch.tensor(0.5)) * (torch.tensor((y - y_hat), dtype=torch.float64))
                         self.task = "classification"
                     else:
                          y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat).to(dtype=torch.float32)
@@ -134,9 +134,10 @@ class IGANNAdapter(IGANN):
                         n_input=1,
                         n_categorical_cols=n_categorical_cols,
                         n_hid=self.n_hid,
-                        seed=42,
+                        seed=0,
                         elm_scale=self.elm_scale,
-                        elm_alpha=0.001,
+                        # 0.002
+                        elm_alpha=1,
                         act=self.act,
                         device=self.device,
                     )
@@ -144,9 +145,9 @@ class IGANNAdapter(IGANN):
                         x.reshape(-1, 1),
                         # y - y_hat = y_tilde
                         y_tilde,
-                        torch.sqrt(torch.tensor(0.5).to(self.device))
+                        torch.ones_like(torch.sqrt(torch.tensor(0.5).to(self.device))
                         * self.boost_rate
-                        * hessian_train_sqrt[:, None],
+                        * hessian_train_sqrt[:, None])
                     )
                     # Make a prediction of the ELM for the update of y_hat
                     if self.task == "classification":

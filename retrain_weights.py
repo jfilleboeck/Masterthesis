@@ -11,9 +11,9 @@ if __name__ == "__main__":
     print("Running main script")
 
     # Load and split the data    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
-    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
+    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
-    X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
+    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("bike")
 
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
@@ -38,11 +38,11 @@ if __name__ == "__main__":
 
     #features_to_change = ['sepal length (cm)', 'sepal width (cm)',  'petal length (cm)', 'petal width (cm)']
     ##features_to_change = ['sepal length (cm)', 'sepal width (cm)']
-    #features_to_change = ['petal length (cm)', 'petal width (cm)']
+    features_to_change = ['petal length (cm)', 'petal width (cm)']
 
     #features_to_change = ['petal width (cm)']
     #features_to_change = ['temp']
-    features_to_change = ['bmi', 'bp', 'sex']
+    #features_to_change = ['bmi', 'bp', 'sex']
     #features_to_change = ['Age', 'Members']
     #features_to_change = ['education_num', 'workclass', 'marital-status', 'capital-loss']
     # Load feature data
@@ -83,11 +83,11 @@ if __name__ == "__main__":
                 #y_values = np.where(y_values < 0, -3, y_values)
                 #updated_data[name] = {'x': x_values.tolist(), 'y': adjusted_y_values.tolist(),
                 #                      'datatype': 'numerical'}
-                synthetic_data_points_nr = 2
+                synthetic_data_points_nr = 0
                 new_x_values = []
                 new_y_values = []
                 #transformed_y_values = np.where(y_values < 0.8, 0.9, y_values)
-                transformed_y_values = np.where(y_values < 0, -4, y_values)
+                transformed_y_values = np.where(y_values < 0, -8, y_values)
                 if synthetic_data_points_nr > 0:
                     for i in range(len(x_values) - 1):
                         new_x_values.append(x_values[i])
