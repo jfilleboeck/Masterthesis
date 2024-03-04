@@ -124,6 +124,7 @@ class IGANNAdapter(IGANN):
                         #y_tilde = (torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat)).to(
                         #    dtype=torch.float64)
                         y_tilde = torch.sqrt(torch.tensor(0.5)) * (torch.tensor((y - y_hat), dtype=torch.float64))
+                        #y_tilde = (torch.tensor((y - y_hat), dtype=torch.float64))
                         self.task = "classification"
                     else:
                          y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat).to(dtype=torch.float32)
@@ -134,21 +135,31 @@ class IGANNAdapter(IGANN):
                         n_input=1,
                         n_categorical_cols=n_categorical_cols,
                         n_hid=self.n_hid,
-                        seed=0,
+                        seed=1,
                         elm_scale=self.elm_scale,
                         # 0.002
                         elm_alpha=1,
                         act=self.act,
                         device=self.device,
                     )
-                    X_hid = new_regressor.fit(
-                        x.reshape(-1, 1),
-                        # y - y_hat = y_tilde
-                        y_tilde,
-                        torch.ones_like(torch.sqrt(torch.tensor(0.5).to(self.device))
-                        * self.boost_rate
-                        * hessian_train_sqrt[:, None])
-                    )
+                    if self.task == 'classification':
+                        X_hid = new_regressor.fit(
+                            x.reshape(-1, 1),
+                            # y - y_hat = y_tilde
+                            y_tilde,
+                            torch.ones_like(torch.sqrt(torch.tensor(0.5).to(self.device))
+                            * self.boost_rate
+                            * hessian_train_sqrt[:, None])
+                        )
+                    else:
+                        X_hid = new_regressor.fit(
+                            x.reshape(-1, 1),
+                            # y - y_hat = y_tilde
+                            y_tilde,
+                            torch.sqrt(torch.tensor(0.5).to(self.device))
+                            * self.boost_rate
+                            * hessian_train_sqrt[:, None]
+                        )
                     # Make a prediction of the ELM for the update of y_hat
                     if self.task == "classification":
                         train_regressor_pred = new_regressor.predict(X_hid.to(dtype=torch.float64), hidden=True).squeeze()
@@ -235,25 +246,26 @@ class IGANNAdapter(IGANN):
             new_regressors.append(new_regressor)
         self.regressors = new_regressors
 
-    def _get_pred_of_i(self, i, x_values=None):
-        if x_values == None:
-            feat_values = self.unique[i]
-        else:
-            feat_values = x_values[i]
-        if self.task == "classification":
-            pred = self.init_classifier.coef_[0, i] * feat_values
-        else:
-            pred = self.init_classifier.coef_[i] * feat_values
-        feat_values = feat_values.to(self.device)
-        if self.task == "classification":
-            if self.spline_interpolation_run == True:
-                pred = torch.zeros_like(pred)
-        for regressor, boost_rate in zip(self.regressors, self.boosting_rates):
-            pred += (
-                boost_rate
-                * regressor.predict_single(feat_values.reshape(-1, 1), i).squeeze()
-            ).cpu()
-        return feat_values, pred
+    # def _get_pred_of_i(self, i, x_values=None):
+    #     if x_values == None:
+    #         feat_values = self.unique[i]
+    #     else:
+    #         feat_values = x_values[i]
+    #     if self.task == "classification":
+    #         pred = self.init_classifier.coef_[0, i] * feat_values
+    #     else:
+    #         pred = self.init_classifier.coef_[i] * feat_values
+    #     feat_values = feat_values.to(self.device)
+    #     if self.task == "classification":
+    #         pass
+    #         #if self.spline_interpolation_run == True:
+    #             #pred = torch.zeros_like(pred)
+    #     for regressor, boost_rate in zip(self.regressors, self.boosting_rates):
+    #         pred += (
+    #             boost_rate
+    #             * regressor.predict_single(feat_values.reshape(-1, 1), i).squeeze()
+    #         ).cpu()
+    #     return feat_values, pred
 
 
 
@@ -292,13 +304,18 @@ class ELM_Regressor_Spline(ELM_Regressor):
         # Add spline function values for selected features
         for i in self.features_selected_i:
             spline = self.spline_functions[i]
+            if self.task == "classification":
+                pred_init_classifier = self.init_classifier.coef_[0, i] * X[:, i]
+            else:
+                pred_init_classifier = self.init_classifier.coef_[i] * X[:, i]
+            share_of_init_classifier = np.array(pred_init_classifier / self.n_regressors)
             if i < self.n_numerical_cols:
-                prediction = spline(X[:, i]) / self.n_regressors * (1/self.boosting_rates[self.index_regressor])
+                prediction = ((spline(X[:, i]) / self.n_regressors) - share_of_init_classifier) * (1/self.boosting_rates[self.index_regressor])
             else:
                 # for categorical features, spline is simply the y value, which the user determined
                 #prediction = torch.from_numpy(spline)
                 user_prediction = torch.from_numpy(self.spline_functions[i]) * X[:, i]
-                prediction = user_prediction / self.n_regressors * (1 / self.boosting_rates[self.index_regressor])
+                prediction = ((user_prediction / self.n_regressors) - share_of_init_classifier) * (1 / self.boosting_rates[self.index_regressor])
             out += prediction
         return out
 
@@ -335,21 +352,18 @@ class ELM_Regressor_Spline(ELM_Regressor):
                 pred_init_classifier = self.init_classifier.coef_[0, i] * x
             else:
                 pred_init_classifier = self.init_classifier.coef_[i] * x
+            share_of_init_classifier = np.array(pred_init_classifier / self.n_regressors)
             if i < self.n_numerical_cols:
                 # If the feature is selected, use the spline function for prediction
                 spline = self.spline_functions[i]
-                # out = (spline(x) / self.n_regressors * (1/self.boosting_rates[self.index_regressor])
-                #        - np.array(pred_init_classifier / self.n_regressors))
-                out = (spline(x) / self.n_regressors * (1/self.boosting_rates[self.index_regressor]))
-                # if self.index_regressor == 0:
-                #     out -= np.array(pred_init_classifier)
+                out = ((spline(x) / self.n_regressors) - share_of_init_classifier) * (1/self.boosting_rates[self.index_regressor])
                 if isinstance(out, np.ndarray):
                     out = torch.from_numpy(out).float()
             else:
                 prediction = torch.from_numpy(self.spline_functions[i]) * x
                 # out = (prediction / self.n_regressors * (1/self.boosting_rates[self.index_regressor])
                 #        - pred_init_classifier/self.n_regressors)
-                out = (prediction / self.n_regressors * (1/self.boosting_rates[self.index_regressor]))
+                out = ((prediction / self.n_regressors)- share_of_init_classifier) * (1/self.boosting_rates[self.index_regressor])
                 if isinstance(out, np.ndarray):
                     out = torch.from_numpy(out).float()
                 # if self.index_regressor == 0:

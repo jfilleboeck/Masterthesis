@@ -11,10 +11,10 @@ if __name__ == "__main__":
     print("Running main script")
 
     # Load and split the data    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
-    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
+    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
-    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("bike")
+    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("bike")
 
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
 
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     #features_to_change = ['petal width (cm)']
     #features_to_change = ['temp']
     #features_to_change = ['bmi', 'bp', 'sex']
-    #features_to_change = ['Age', 'Members']
+    #features_to_change = ['Age']
     #features_to_change = ['education_num', 'workclass', 'marital-status', 'capital-loss']
     # Load feature data
     shape_functions_dict = adapter.model.get_shape_functions_as_dict()
@@ -75,9 +75,6 @@ if __name__ == "__main__":
                 #                                         -2, np.array(feature_current_state[name])), 'datatype': 'categorical'}
                 #y_values = np.array(feature_current_state[name])
             else:
-                num_affected_values = np.sum(np.array(feature_current_state[name]) < 0)
-                print(name)
-                print("Number of values affected (less than 0):", num_affected_values)
                 #y_values = np.where(np.array(feature_current_state[name]) < 0, -10, feature_current_state[name])
                 y_values = np.array(feature_current_state[name])
                 #y_values = np.where(y_values < 0, -3, y_values)
@@ -87,7 +84,7 @@ if __name__ == "__main__":
                 new_x_values = []
                 new_y_values = []
                 #transformed_y_values = np.where(y_values < 0.8, 0.9, y_values)
-                transformed_y_values = np.where(y_values < 0, -8, y_values)
+                transformed_y_values = np.where(y_values > 0, 1, y_values)
                 if synthetic_data_points_nr > 0:
                     for i in range(len(x_values) - 1):
                         new_x_values.append(x_values[i])
