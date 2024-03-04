@@ -106,8 +106,9 @@ class IGANNAdapter(IGANN):
             y_hat_first_values = []
             y_tilde_first_values = []
             if self.task == "classification":
-                y_hat = self.init_classifier.coef_[0, i] * x.numpy() + self.init_classifier.intercept_
+                y_hat = torch.tensor(self.init_classifier.coef_[0, i] * x.numpy(), dtype=torch.float64)
             else:
+                # + self.init_classifier.intercept_
                 y_hat = self.init_classifier.coef_[i] * x.numpy() + self.init_classifier.intercept_
             #print(y)
             #self.task = "regression"
@@ -122,7 +123,7 @@ class IGANNAdapter(IGANN):
                     if self.task == "classification":
                         #self.task = "regression"
                         #y_tilde = (torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat)).to(
-                        #    dtype=torch.float64)
+                         #   dtype=torch.float64)
                         y_tilde = torch.sqrt(torch.tensor(0.5)) * (torch.tensor((y - y_hat), dtype=torch.float64))
                         #y_tilde = (torch.tensor((y - y_hat), dtype=torch.float64))
                         self.task = "classification"

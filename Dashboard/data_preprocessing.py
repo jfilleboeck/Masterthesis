@@ -66,7 +66,7 @@ def load_and_preprocess_data(dataset='diabetes'):
         # Update y to keep only the rows that are still in X
         y = y.loc[X.index]
 
-        X = X.drop(columns=['instant', 'dteday'])
+        #X = X.drop(columns=['instant', 'dteday'])
 
 
         numerical_features = ['age', 'fnlwgt', 'education-num', 'capital-gain', 'capital-loss', 'hours-per-week']

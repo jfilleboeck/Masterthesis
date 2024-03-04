@@ -12,9 +12,9 @@ if __name__ == "__main__":
 
     # Load and split the data    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
-    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
+    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
-    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("bike")
+   # X_train, X_test, y_train, y_test, task = load_and_preprocess_data("bike")
 
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
 
@@ -37,13 +37,13 @@ if __name__ == "__main__":
 
 
     #features_to_change = ['sepal length (cm)', 'sepal width (cm)',  'petal length (cm)', 'petal width (cm)']
-    ##features_to_change = ['sepal length (cm)', 'sepal width (cm)']
-    features_to_change = ['petal length (cm)', 'petal width (cm)']
+    #features_to_change = ['sepal length (cm)', 'sepal width (cm)']
+    #features_to_change = ['petal length (cm)', 'petal width (cm)']
 
-    #features_to_change = ['petal width (cm)']
+    #features_to_change = ['sepal width (cm)']
     #features_to_change = ['temp']
     #features_to_change = ['bmi', 'bp', 'sex']
-    #features_to_change = ['Age']
+    features_to_change = ['Age']
     #features_to_change = ['education_num', 'workclass', 'marital-status', 'capital-loss']
     # Load feature data
     shape_functions_dict = adapter.model.get_shape_functions_as_dict()
@@ -84,7 +84,7 @@ if __name__ == "__main__":
                 new_x_values = []
                 new_y_values = []
                 #transformed_y_values = np.where(y_values < 0.8, 0.9, y_values)
-                transformed_y_values = np.where(y_values > 0, 1, y_values)
+                transformed_y_values = np.where(y_values > -5, 3, y_values)
                 if synthetic_data_points_nr > 0:
                     for i in range(len(x_values) - 1):
                         new_x_values.append(x_values[i])
@@ -136,16 +136,43 @@ if __name__ == "__main__":
         print(f"Train F1 Score: {f1_train}, Test F1 Score: {f1_test}")
 
     adapter.plot_single(plot_by_list=features_to_change)
-    #self.feature_names.index(feature)
-    # i = 7
-    # pred = adapter.init_classifier.coef_[0, i] * np.array([0, 1])
-    # print(pred)
+    print(adapter.feature_names)
+    x = torch.tensor([-2.0177, -2.0005, -1.9949, -1.9894, -1.9832, -1.9777, -1.9086, -1.8396,
+     -1.7705, -1.7015, -1.6324, -1.5634, -1.4943, -1.4253, -1.3562, -1.2872,
+     -1.2181, -1.1491, -1.0800, -1.0455, -1.0110, -0.9420, -0.8729, -0.8039,
+     -0.7348, -0.6658, -0.6312, -0.5967, -0.5277, -0.4586, -0.4241, -0.3896,
+     -0.3205, -0.2515, -0.1824, -0.1134, -0.0789, -0.0443, 0.0247, 0.0592,
+     0.0938, 0.1628, 0.1973, 0.2319, 0.3009, 0.3700, 0.4390, 0.5080,
+     0.5771, 0.6461, 0.7152, 0.7497, 0.7842, 0.8533, 0.9223, 0.9914,
+     1.0604, 1.0950, 1.1295, 1.1985, 1.2676, 1.3366, 1.4057, 1.4747,
+     1.5438, 1.6819, 1.7509, 1.7854, 1.8200, 1.8890, 1.9580, 2.0271,
+     2.0961, 2.1652, 2.2342, 2.3033, 2.3723, 2.4414, 2.5104, 2.7866,
+     2.8557, 3.0628, 3.4771])
+    i = 0
+    #[-2, -1.7, -1.3, -1, 0 , 1, 2]
+    print("Intercept: ")
+    print(adapter.init_classifier.intercept_)
+    pred = adapter.init_classifier.coef_[0, i] * np.array(x)
+    print("Prediction Init Classifier: ")
+    print(pred)
     # print(adapter.feature_names)
-    # pred = 0
-    #
+
+    #pred_new = np.array([0, 0, 0, 0, 0])
+    pred_new = torch.tensor([0, 0, 0, 0, 0, 0, 0], dtype=torch.float)
+
+    #pred_new = pred.tolist()
+    for regressor, boost_rate in zip(adapter.regressors, adapter.boosting_rates):
+        pred_new += (
+            boost_rate
+            * regressor.predict_single((torch.tensor([-2, -1.7, -1.3, -1, 0 , 1, 2], dtype=torch.float)).reshape(-1, 1), i).squeeze()
+        ).cpu()
+    print("Prediction Regressoren: ")
+    print(pred_new)
+
     # for regressor, boost_rate in zip(adapter.regressors, adapter.boosting_rates):
-    #     pred += (
+    #     pred_new += (
     #         boost_rate
-    #         * regressor.predict_single((torch.tensor(-1, dtype=torch.float)).reshape(-1, 1), i).squeeze()
+    #         * regressor.predict_single((torch.tensor([-2, -1, 0 , 1, 2], dtype=torch.float)).reshape(-1, 1), i).squeeze()
     #     ).cpu()
-    # print(pred)
+    # print("Prediction Regressoren: ")
+    # print(pred_new)
