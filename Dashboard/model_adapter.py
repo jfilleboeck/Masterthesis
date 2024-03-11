@@ -127,7 +127,7 @@ class IGANNAdapter(IGANN):
                         seed=1,
                         elm_scale=self.elm_scale,
                         # 0.002
-                        elm_alpha=1,
+                        elm_alpha=0.001,
                         act=self.act,
                         device=self.device,
                     )

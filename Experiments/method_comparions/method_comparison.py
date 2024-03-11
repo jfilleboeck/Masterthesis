@@ -344,7 +344,7 @@ if __name__ == "__main__":
                  # plot Methode anpassen, dass es auserdem ein Feature Original gibt, bei dem kein roter Strich eingezeichnet wird
                  # außerdem soll unterdem Plot der MSE/F1 train/test angezeigt werden
 
-
+                plot_single(adapter.model, updated_data, feature_to_change)
 
             # Rows erst am ende hinzufügen
             row = {"Dataset": dataset,
@@ -365,16 +365,16 @@ if __name__ == "__main__":
 
 
 
-    y_train_pred = adapter.predict(X_train)
-    y_test_pred = adapter.predict(X_test)
-    if task == "regression":
-        mse_train = mean_squared_error(y_train, y_train_pred)
-        mse_test = mean_squared_error(y_test, y_test_pred)
-        print(f"MSE Train: {mse_train}, MSE Test: {mse_test}")
-    else:
-        f1_train = f1_score(y_train, y_train_pred, average='weighted')
-        f1_test = f1_score(y_test, y_test_pred, average='weighted')
-        print(f"Train F1 Score: {f1_train}, Test F1 Score: {f1_test}")
+    # y_train_pred = adapter.predict(X_train)
+    # y_test_pred = adapter.predict(X_test)
+    # if task == "regression":
+    #     mse_train = mean_squared_error(y_train, y_train_pred)
+    #     mse_test = mean_squared_error(y_test, y_test_pred)
+    #     print(f"MSE Train: {mse_train}, MSE Test: {mse_test}")
+    # else:
+    #     f1_train = f1_score(y_train, y_train_pred, average='weighted')
+    #     f1_test = f1_score(y_test, y_test_pred, average='weighted')
+    #     print(f"Train F1 Score: {f1_train}, Test F1 Score: {f1_test}")
 
 
 
