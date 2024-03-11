@@ -256,8 +256,8 @@ function SplineInterpolation(selectedFeatures) {
 }
 
 
-function retrainFeature() {
-    const displayed_feature = document.getElementById('display-feature').value;;
+function retrainFeature(selectedFeatures) {
+    const displayed_feature = document.getElementById('display-feature').value;
     fetch('/retrain_feature', {
         method: 'POST',
         headers: {
@@ -267,7 +267,18 @@ function retrainFeature() {
     })
     .then(response => response.json())
     .then(data => {
-        Plotly.update('plot', {y: [data.y]});
+        if (data.error) {
+            alert('Error occurred: ' + data.error);
+        }
+        else {
+            Plotly.update('plot', {
+                y: [data.y]
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while processing your request.');
     });
 }
 

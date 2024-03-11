@@ -243,7 +243,6 @@ def monotonic_decrease():
 @app.route('/cubic_spline_interpolate', methods=['POST'])
 def cubic_spline_interpolate():
     data = request.json
-    # change name of selectedFeatures into features_to_incorporate
     selectedFeatures = data['selectedFeatures']
     displayed_feature = data['displayed_feature']
     #feature_data = next((item for item in shape_functions_dict if item['name'] == displayed_feature), None)
@@ -279,6 +278,38 @@ def cubic_spline_interpolate():
 #     global shape_functions_dict
 #     shape_functions_dict = model.get_shape_functions_as_dict()
 
+
+@app.route('/retrain_feature', methods=['POST'])
+def retrain_feature():
+    data = request.json
+    selectedFeatures = data['selectedFeatures']
+    displayed_feature = data['displayed_feature']
+
+    updated_data = {}
+    for feature in shape_functions_dict:
+        name = feature['name']
+        x_values = feature['x']
+        if name in selectedFeatures:
+            y_values = np.array(feature_current_state[name])
+        else:
+            y_values = feature['y']
+        # feature_data_dict = next(item for item in shape_functions_dict if item['name'] == displayed_feature)
+        if feature['datatype'] == 'numerical':
+            updated_data[name] = {'x': x_values, 'y': y_values.tolist(), 'datatype': 'numerical'}
+        else:
+            updated_data[name] = {'x': x_values, 'y': y_values, 'datatype': 'categorical'}
+    # x_data = feature_data_dict['x'].tolist()
+    # y_data = feature_current_state[displayed_feature].tolist()
+    model.adapt(selectedFeatures, updated_data, "feature_retraining")
+    # shape_functions_dict = model.model.get_shape_functions_as_dict()
+    # load_data()
+    # replace_model(adapter)
+    displayed_feature_data = next(
+        (item for item in model.get_shape_functions_as_dict() if item['name'] == displayed_feature), None)
+
+    x_data = displayed_feature_data['x']
+    y_data = displayed_feature_data['y']
+    return jsonify({'x': x_data.tolist(), 'y': y_data.tolist()})
 
 
 
@@ -343,25 +374,6 @@ def undo_last_change():
     else:
         return jsonify({'error': 'No more changes to undo for feature ' + selected_feature}), 400
 
-
-@app.route('/retrain_feature', methods=['POST'])
-def retrain_feature():
-    data = request.json
-    selected_feature = data['selected_feature']
-    feature_data_dict = next(item for item in model.get_shape_functions_as_dict() if item['name'] == selected_feature)
-    print(model.feature_names)
-    print(selected_feature)
-    y_data = feature_current_state[selected_feature]
-    print(y_data)
-    model.adapt(selected_feature, y_data, "retrain_feature", X_train, y_train)
-    # TODO: Archivierung
-    # TODO: Momentan werden alle Features zurückgesetzt
-
-    feature_data_dict = next(item for item in model.get_shape_functions_as_dict() if item['name'] == selected_feature)
-    print(feature_data_dict)
-    feature_current_state[selected_feature] = feature_data_dict['y']
-
-    return jsonify({'y': feature_current_state[selected_feature].tolist()})
 
 
 
