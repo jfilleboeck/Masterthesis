@@ -19,18 +19,18 @@ class ModelAdapter():
     def fit(self, X_train, y_train):
         self.model.fit(X_train, y_train)
 
-    def adapt(self, features_to_change, updated_data, method, X_train, y_train):
+    def adapt(self, features_to_change, updated_data, method):
         if self.model_name == "IGANN":
-            if method == "retrain_feature":
-                self.model.feature_retraining(features_to_change, updated_data, X_train, y_train)
-            if method == "spline":
-                self.model.spline_interpolation(features_to_change, updated_data, X_train, y_train)
+            if method == "feature_retraining":
+                self.model.feature_retraining(features_to_change, updated_data)
+            if method == "spline_interpolation":
+                self.model.spline_interpolation(features_to_change, updated_data)
         return self.model
 
-    def plot_single(self, plot_by_list):
+    def plot_single(self, plot_by_list=None, show_n=5):
         # Check if the underlying model has 'plot_single' method
         if hasattr(self.model, 'plot_single'):
-            return self.model.plot_single(plot_by_list)
+            return self.model.plot_single(plot_by_list=plot_by_list, show_n=show_n)
         else:
             raise NotImplementedError("Plotting is not supported for this model.")
 
@@ -91,7 +91,7 @@ class IGANNAdapter(IGANN):
                 updated_data_extended[feature] = updated_data[feature]
         return features_to_change_extended, updated_data_extended
 
-    def feature_retraining(self, features_to_change, updated_data, X_train, y_train):
+    def feature_retraining(self, features_to_change, updated_data):
         features_to_change, updated_data = self.encode_categorical_data(features_to_change, updated_data)
         # change next line to updated_selected_features
         for feature in features_to_change:
@@ -110,23 +110,11 @@ class IGANNAdapter(IGANN):
             else:
                 # + self.init_classifier.intercept_
                 y_hat = self.init_classifier.coef_[i] * x.numpy() + self.init_classifier.intercept_
-            #print(y)
-            #self.task = "regression"
-            #y_hat = np.zeros_like(y_hat)
             n_categorical_cols = 1 if updated_data[feature]['datatype'] == 'categorical' else 0
             for counter, regressor in enumerate(self.regressors):
-                    # Store the first value of each tensor for plotting
-                y_first_values.append(y[0].item())
-                y_hat_first_values.append(y_hat[0])
-
                 if updated_data[feature]['datatype'] == 'numerical':
                     if self.task == "classification":
-                        #self.task = "regression"
-                        #y_tilde = (torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat)).to(
-                         #   dtype=torch.float64)
                         y_tilde = torch.sqrt(torch.tensor(0.5)) * (torch.tensor((y - y_hat), dtype=torch.float64))
-                        #y_tilde = (torch.tensor((y - y_hat), dtype=torch.float64))
-                        self.task = "classification"
                     else:
                          y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat).to(dtype=torch.float32)
                     hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
@@ -181,26 +169,14 @@ class IGANNAdapter(IGANN):
                 else:
                     # for categorical features only update the weight
                     # train_regressor_pred = torch.from_numpy(y) * X[:, i]
-                    new_weight = y / len(self.regressors) * (1 / self.boosting_rates[counter])
+                    share_of_init_classifier = np.array(y_hat / len(self.regressors))
+                    new_weight = (y / len(self.regressors) - share_of_init_classifier) * (1 / self.boosting_rates[counter])
                     regressor.output_model.coef_[i * self.n_hid: (i + 1) * self.n_hid] = new_weight
 
-            if len(y_first_values) > 0:  # Ensure there's data to plot
-                plt.figure(figsize=(10, 6))
-                plt.scatter(range(len(y_first_values)), y_first_values, label='y', color='blue')
-                plt.scatter(range(len(train_regressor_pred_first_values)), train_regressor_pred_first_values,
-                            label='train_regressor_pred', color='red')
-                plt.scatter(range(len(y_hat_first_values)), y_hat_first_values, label='y_hat (before update)',
-                            color='green')
-                plt.scatter(range(len(y_tilde_first_values)), y_tilde_first_values, label='y_tilde', color='orange')
 
-                plt.title('First Value Comparison for First 8 Iterations')
-                plt.xlabel('Iteration')
-                plt.ylabel('Value')
-                plt.legend()
-                plt.grid(True)
-                plt.show()
 
-    def spline_interpolation(self, features_to_change, updated_data, X_train, y_train):
+
+    def spline_interpolation(self, features_to_change, updated_data):
         self.spline_interpolation_run = True
         features_to_change, updated_data = self.encode_categorical_data(features_to_change, updated_data)
         # create cubic spline

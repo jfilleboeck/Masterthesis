@@ -32,6 +32,8 @@ def load_and_preprocess_data(dataset='diabetes'):
         X = bike_sharing_dataset.data.features
         y = bike_sharing_dataset.data.targets
         X.dropna()
+        X = X.drop(columns=['dteday'])
+
         # Update y to keep only the rows that are still in X
         y = y.loc[X.index]
         y = (y - y.mean()) / y.std()
@@ -47,10 +49,12 @@ def load_and_preprocess_data(dataset='diabetes'):
         categorical_features = [feature for feature in X if feature not in numerical_features]
         X_categorical = X.loc[:, categorical_features].astype('object')
 
-        # Convert the datatypes of categorical features to 'object'
-        #X_categorical = X_categorical.astype('object')
 
         X = pd.concat([X_scaled, X_categorical], axis=1)
+        #X = X.astype('object')
+
+        #X = X[['hr', 'mnth', 'weekday']].astype('object')
+
 
         X_train, X_test, y_train, y_test = train_test_split(X, np.array(y), test_size=0.2, random_state=42)
         task = "regression"
@@ -117,17 +121,20 @@ def load_and_preprocess_data(dataset='diabetes'):
         train_data_raw = pd.read_csv(train_csv_path)
         X = train_data_raw.drop('Survived', axis=1)
         y = train_data_raw['Survived']
+        # Change X to lower case
+        X.columns = [col[0].lower() + col[1:] if col else col for col in X.columns]
+        X = X.dropna(subset=['embarked', 'age'])
 
-        X = X.dropna(subset=['Embarked', 'Age'])
         # Update y to keep only the rows that are still in X
         y = y.loc[X.index]
         #
-        X['Pclass'] = X['Pclass'].astype('object')
-        X = X.drop(columns=['PassengerId', 'Name', 'Ticket', 'Cabin'])
-        X['Members'] = X['SibSp'] + X['Parch']
-        X = X.drop(columns=['SibSp', 'Parch'])
+        X['pclass'] = X['pclass'].astype('object')
+        X = X.drop(columns=['passengerId', 'name', 'ticket', 'cabin'])
+        X['members'] = (X['sibSp'] + X['parch'])
+        #X['Members'] = X['Members'].astype('object')
+        X = X.drop(columns=['sibSp', 'parch'])
 
-        exclude = ['Pclass', 'Sex', 'Embarked']
+        exclude = ['pclass', 'sex', 'embarked', 'members']
         X_numeric = X.drop(columns=exclude)
         X_categorical = X[exclude]
 

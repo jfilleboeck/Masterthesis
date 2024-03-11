@@ -10,11 +10,12 @@ import torch
 if __name__ == "__main__":
     print("Running main script")
 
-    # Load and split the data    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
+    # Load and split the data
+    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("adult")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
     X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
-   # X_train, X_test, y_train, y_test, task = load_and_preprocess_data("bike")
+   #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("adult")
 
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
 
@@ -40,16 +41,20 @@ if __name__ == "__main__":
     #features_to_change = ['sepal length (cm)', 'sepal width (cm)']
     #features_to_change = ['petal length (cm)', 'petal width (cm)']
 
+    #features_to_change = ['temp', 'atemp', 'hum', 'windspeed']
+
+
     #features_to_change = ['sepal width (cm)']
     #features_to_change = ['temp']
     #features_to_change = ['bmi', 'bp', 'sex']
-    features_to_change = ['Age']
-    #features_to_change = ['education_num', 'workclass', 'marital-status', 'capital-loss']
+    features_to_change = ['Age', 'Members', 'Sex']
+    #features_to_change = ['education-num', 'workclass', 'marital-status', 'capital-loss']
     # Load feature data
     shape_functions_dict = adapter.model.get_shape_functions_as_dict()
     #adapter.plot_single(plot_by_list=['age', 'bmi', 'bp', 'sex', 's1', 's2'])
     #adapter.plot_single(plot_by_list=features_to_change)
-    adapter.model.plot_single(show_n=10)
+    adapter.model.plot_single(show_n=15)
+    #adapter.model.plot_single(plot_by_list=['hr', 'mnth', 'weekday'], max_cat_plotted=12)
     print(adapter.model)
     # this part is already given in the flask application
     feature_current_state = {}
@@ -77,14 +82,15 @@ if __name__ == "__main__":
             else:
                 #y_values = np.where(np.array(feature_current_state[name]) < 0, -10, feature_current_state[name])
                 y_values = np.array(feature_current_state[name])
-                #y_values = np.where(y_values < 0, -3, y_values)
+                y_values = np.where(y_values < 0, -2, y_values)
+                y_values = np.where(y_values > 0, 2, y_values)
                 #updated_data[name] = {'x': x_values.tolist(), 'y': adjusted_y_values.tolist(),
                 #                      'datatype': 'numerical'}
-                synthetic_data_points_nr = 0
+                synthetic_data_points_nr = 200
                 new_x_values = []
                 new_y_values = []
                 #transformed_y_values = np.where(y_values < 0.8, 0.9, y_values)
-                transformed_y_values = np.where(y_values > -5, 3, y_values)
+                transformed_y_values = np.where(y_values < 0, -2, y_values)
                 if synthetic_data_points_nr > 0:
                     for i in range(len(x_values) - 1):
                         new_x_values.append(x_values[i])
@@ -122,7 +128,7 @@ if __name__ == "__main__":
     # updated_data == feature-current_state; anpassen für kategorische Werte
     # Als erstes möchte ich eine Liste von features to change übergeben
 
-    adapter = adapter.adapt(features_to_change, updated_data, "retrain_feature", X_train, y_train)
+    adapter = adapter.adapt(features_to_change, updated_data, "feature_retraining", X_train, y_train)
 
     y_train_pred = adapter.predict(X_train)
     y_test_pred = adapter.predict(X_test)
@@ -136,7 +142,6 @@ if __name__ == "__main__":
         print(f"Train F1 Score: {f1_train}, Test F1 Score: {f1_test}")
 
     adapter.plot_single(plot_by_list=features_to_change)
-    print(adapter.feature_names)
     x = torch.tensor([-2.0177, -2.0005, -1.9949, -1.9894, -1.9832, -1.9777, -1.9086, -1.8396,
      -1.7705, -1.7015, -1.6324, -1.5634, -1.4943, -1.4253, -1.3562, -1.2872,
      -1.2181, -1.1491, -1.0800, -1.0455, -1.0110, -0.9420, -0.8729, -0.8039,
@@ -150,24 +155,24 @@ if __name__ == "__main__":
      2.8557, 3.0628, 3.4771])
     i = 0
     #[-2, -1.7, -1.3, -1, 0 , 1, 2]
-    print("Intercept: ")
-    print(adapter.init_classifier.intercept_)
-    pred = adapter.init_classifier.coef_[0, i] * np.array(x)
-    print("Prediction Init Classifier: ")
-    print(pred)
+    #print("Intercept: ")
+    #print(adapter.init_classifier.intercept_)
+    # pred = adapter.init_classifier.coef_[0, i] * np.array(x)
+    #print("Prediction Init Classifier: ")
+    #print(pred)
     # print(adapter.feature_names)
 
     #pred_new = np.array([0, 0, 0, 0, 0])
     pred_new = torch.tensor([0, 0, 0, 0, 0, 0, 0], dtype=torch.float)
 
     #pred_new = pred.tolist()
-    for regressor, boost_rate in zip(adapter.regressors, adapter.boosting_rates):
-        pred_new += (
-            boost_rate
-            * regressor.predict_single((torch.tensor([-2, -1.7, -1.3, -1, 0 , 1, 2], dtype=torch.float)).reshape(-1, 1), i).squeeze()
-        ).cpu()
-    print("Prediction Regressoren: ")
-    print(pred_new)
+    # for regressor, boost_rate in zip(adapter.regressors, adapter.boosting_rates):
+    #     pred_new += (
+    #         boost_rate
+    #         * regressor.predict_single((torch.tensor([-2, -1.7, -1.3, -1, 0 , 1, 2], dtype=torch.float)).reshape(-1, 1), i).squeeze()
+    #     ).cpu()
+    # #print("Prediction Regressoren: ")
+    #print(pred_new)
 
     # for regressor, boost_rate in zip(adapter.regressors, adapter.boosting_rates):
     #     pred_new += (
