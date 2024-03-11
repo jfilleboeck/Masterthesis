@@ -11,7 +11,7 @@ import seaborn as sns
 
 
 
-def plot_single(adapter, perfect_plot = None, plot_by_list=None, show_n=5, scaler_dict=None, max_cat_plotted=4):
+def plot_single(adapter, shape_functions_for_plotting, updated_data_dict_for_plotting, plot_by_list=None, show_n=5, scaler_dict=None, max_cat_plotted=4):
     """
     This function plots the most important shape functions.
     Parameters:
@@ -19,23 +19,30 @@ def plot_single(adapter, perfect_plot = None, plot_by_list=None, show_n=5, scale
     scaler_dict: dictionary that maps every numerical feature to the respective (sklearn) scaler.
                  scaler_dict[num_feature_name].inverse_transform(...) is called if scaler_dict is not None
     """
-    shape_functions = adapter.get_shape_functions_as_dict()
+    shape_functions = shape_functions_for_plotting
+    # if plot_by_list is None:
+    #     top_k = [
+    #                 d
+    #                 for d in sorted(
+    #             shape_functions, reverse=True, key=lambda x: x["avg_effect"]
+    #         )
+    #             ][:show_n]
+    #     show_n = min(show_n, len(top_k))
+    # else:
+    #     top_k = [
+    #         d
+    #         for d in sorted(
+    #             shape_functions, reverse=True, key=lambda x: x["avg_effect"]
+    #         )
+    #     ]
+    #     show_n = len(plot_by_list)
     if plot_by_list is None:
-        top_k = [
-                    d
-                    for d in sorted(
-                shape_functions, reverse=True, key=lambda x: x["avg_effect"]
-            )
-                ][:show_n]
+        top_k = [d for d in shape_functions][:show_n]
         show_n = min(show_n, len(top_k))
     else:
-        top_k = [
-            d
-            for d in sorted(
-                shape_functions, reverse=True, key=lambda x: x["avg_effect"]
-            )
-        ]
+        top_k = [d for d in shape_functions]
         show_n = len(plot_by_list)
+
 
     plt.close(fig="Shape functions")
     fig, axs = plt.subplots(
@@ -106,7 +113,7 @@ def plot_single(adapter, perfect_plot = None, plot_by_list=None, show_n=5, scale
 
                 axs[0].set_title(
                     "{}:\n{:.2f}%".format(
-                        adapter._split_long_titles(d["name"]), d["avg_effect"]
+                            adapter._split_long_titles(d["name"]), d["avg_effect"]
                     )
                 )
                 axs[0].grid()
@@ -192,10 +199,10 @@ def plot_single(adapter, perfect_plot = None, plot_by_list=None, show_n=5, scale
                     )
                 )
                 axs[0][i].grid()
-        if perfect_plot is not None and plot_by_list is not None:
-            if d["name"] in perfect_plot and d["name"] in plot_by_list:
+        if updated_data_dict_for_plotting is not None:
+            if d["name"] in updated_data_dict_for_plotting:
                 # Retrieve the perfect_plot data for this feature
-                perfect_data = perfect_plot[d["name"]]
+                perfect_data = updated_data_dict_for_plotting[d["name"]]
                 if d["datatype"] == "categorical":
                     # For categorical data, use a red line at the top of the bars
                     for idx, cat in enumerate(d["x"]):
@@ -243,7 +250,7 @@ if __name__ == "__main__":
     os.makedirs(folder_path, exist_ok=True)
     result = pd.DataFrame(columns=["Dataset", "Feature", "Median (negative/positive)", "MSE median",
                                    "Extreme (negative/positive)", "MSE extreme", "MSE doubling"])
-    simulated_user_adjustments = ["constant_median", "constant_extreme", "doubling"]
+    simulated_user_adjustments = ["set to median", "set to min/max", "double y values"]
     for dataset, (task, features_to_change) in linear_features.items():
         X_train, X_test, y_train, y_test, task = load_and_preprocess_data(dataset)
         for feature_to_change in features_to_change:
@@ -263,7 +270,8 @@ if __name__ == "__main__":
             median_negative = median_positive = mse_median = most_negative = most_positive = mse_extreme = mse_doubling = None
 
             updated_data = {}
-
+            shape_functions_for_plotting = [(shape_functions_dict[adapter.model.feature_names.index(feature_to_change)])]
+            updated_data_dict_for_plotting = {}
             for adjustment in simulated_user_adjustments:
 
                 for feature in shape_functions_dict:
@@ -279,10 +287,10 @@ if __name__ == "__main__":
                         most_negative = np.min(y_values[y_values < 0])
                         most_positive = np.max(y_values[y_values > 0])
 
-                        if adjustment == "constant_median":
+                        if adjustment == "set to median":
                             y_values[y_values < 0] = median_negative
                             y_values[y_values > 0] = median_positive
-                        elif adjustment == "constant_extreme":
+                        elif adjustment == "set to min/max":
                             y_values[y_values < 0] = most_negative
                             y_values[y_values > 0] = most_positive
                         else:
@@ -314,9 +322,7 @@ if __name__ == "__main__":
                             new_y_values.append(transformed_y_values[-1])
                             x_values = new_x_values
                             y_values = new_y_values
-                        else:
-                            print("No synthetic points")
-                        #                       'datatype': 'numerical'}
+
                     else:
                         # Use the original 'y' values from shape_functions_dict if there is no user change
                         y_values = feature['y']
@@ -334,9 +340,9 @@ if __name__ == "__main__":
                 y_optimal = updated_data[feature_to_change]['y']
                 y_hat = adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)]['y']
                 mse_change = mean_squared_error(y_optimal, y_hat)
-                if adjustment == "constant_median":
+                if adjustment == "set to median":
                     mse_median = mse_change
-                elif adjustment == "constant_extreme":
+                elif adjustment == "set to min/max":
                     mse_extreme = mse_change
                 else:
                     mse_median = mse_change
@@ -344,7 +350,30 @@ if __name__ == "__main__":
                  # plot Methode anpassen, dass es auserdem ein Feature Original gibt, bei dem kein roter Strich eingezeichnet wird
                  # außerdem soll unterdem Plot der MSE/F1 train/test angezeigt werden
 
-                plot_single(adapter.model, updated_data, feature_to_change)
+                # MITTAGSPAUSE: umändern zur Liste
+                adjusted_shape_function_tmp = adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)]
+                adjusted_shape_function_tmp['name'] = f"{feature_to_change} - {adjustment}"
+                shape_functions_for_plotting.append(adjusted_shape_function_tmp
+
+                                                    )
+                # adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)]['name']
+                # print(adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)])
+                # x_shape_function = adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)]['x']
+                # y_shape_function = adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)]['y']
+                # datatype_shape_function = adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)]['datatype']
+                # shape_functions_for_plotting.append({'name': f"{feature_to_change} - {adjustment}",
+                #                                      'x': x_shape_function, 'y': y_shape_function,
+                #                                      'datatype': datatype_shape_function})
+
+
+                datatype = adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)]['datatype']
+                updated_data_dict_for_plotting[f"{feature_to_change} - {adjustment}"] =\
+                    {'x': updated_data[feature_to_change]['x'], 'y': updated_data[feature_to_change]['y'],
+                     'datatype': updated_data[feature_to_change]['datatype']}
+
+
+
+            plot_single(adapter.model, shape_functions_for_plotting, updated_data_dict_for_plotting)
 
             # Rows erst am ende hinzufügen
             row = {"Dataset": dataset,
