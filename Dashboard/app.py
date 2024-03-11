@@ -64,29 +64,33 @@ def index():
     )
 
     return render_template('index.html', feature_names=X_names, x_data=x_data,
-                           y_data=y_data, selected_feature=feature_name, is_numeric_feature=is_numeric_feature,
+                           y_data=y_data, displayed_feature=feature_name, is_numeric_feature=is_numeric_feature,
                            hist_data=hist_data, bin_edges=bin_edges)
 
 
 @app.route('/feature_data', methods=['POST'])
 def feature_data():
     data = request.json
-    selected_feature = data['selected_feature']
-    feature_data = next((item for item in shape_functions_dict if item['name'] == selected_feature), None)
+    displayed_feature = data['displayed_feature']
+    feature_data = next((item for item in shape_functions_dict if item['name'] == displayed_feature), None)
     if feature_data:
         if feature_data['datatype'] == 'numerical':
             x_data = feature_data['x'].tolist()
-            y_data = feature_current_state[selected_feature].tolist()
+            y_data = feature_current_state[displayed_feature].tolist()
             # Convert histogram data and bin_edges to list
             hist_data = feature_data['hist'].hist.tolist()
             bin_edges = feature_data['hist'].bin_edges.tolist()
+            #display feature kann entfernet werden
+            print(jsonify({'is_numeric': True, 'x': x_data, 'y': y_data,
+                            'displayed_feature': displayed_feature,
+                            'hist_data': hist_data, 'bin_edges': bin_edges}))
             return jsonify({'is_numeric': True, 'x': x_data, 'y': y_data,
-                            'selected_feature': selected_feature,
+                            'displayed_feature': displayed_feature,
                             'hist_data': hist_data, 'bin_edges': bin_edges})
         else:
             x_data = feature_data['x']
             encoded_x_data = encode_categorical_data(x_data)
-            y_data = feature_current_state[selected_feature]
+            y_data = feature_current_state[displayed_feature]
             y_data = [float(y) if isinstance(y, np.float32) else y for y in y_data]
             # Convert histogram data to list
             hist_data = to_float_list(feature_data['hist'][0])
@@ -94,7 +98,8 @@ def feature_data():
             return jsonify({'is_numeric': False, 'original_values': x_data,
                             'x': encoded_x_data, 'y': y_data,
                             'hist_data': hist_data, 'bin_edges': bin_edges,
-                            'selected_feature': selected_feature})
+                            'displayed_feature': displayed_feature})
+
     else:
         return jsonify({'error': 'Feature not found'}), 404
 
@@ -112,12 +117,12 @@ def to_float_list(lst):
 @app.route('/setConstantValue', methods=['POST'])
 def setConstantValue():
     data = request.json
-    x1, x2, new_y, selected_feature = data['x1'], data['x2'], float(data['new_y']), data['selected_feature']
-    feature_data = next((item for item in shape_functions_dict if item['name'] == selected_feature), None)
+    x1, x2, new_y, displayed_feature = data['x1'], data['x2'], float(data['new_y']), data['displayed_feature']
+    feature_data = next((item for item in shape_functions_dict if item['name'] == displayed_feature), None)
     if not feature_data:
         return jsonify({'error': 'Feature not found'}), 404
 
-    y_data = feature_current_state[selected_feature].copy()
+    y_data = feature_current_state[displayed_feature].copy()
 
     if feature_data['datatype'] == 'numerical':
         x_data = feature_data['x']
@@ -128,8 +133,8 @@ def setConstantValue():
         if x1 <= x <= x2:
             y_data[i] = new_y
 
-    feature_history[selected_feature].append(y_data)
-    feature_current_state[selected_feature] = y_data
+    feature_history[displayed_feature].append(y_data)
+    feature_current_state[displayed_feature] = y_data
 
     return jsonify({'y': y_data if feature_data['datatype'] != 'numerical' else y_data.tolist()})
 
@@ -137,13 +142,13 @@ def setConstantValue():
 @app.route('/setLinear', methods=['POST'])
 def setLinear():
     data = request.json
-    x1, x2, selected_feature = data['x1'], data['x2'], data['selected_feature']
-    feature_data = next((item for item in shape_functions_dict if item['name'] == selected_feature), None)
+    x1, x2, displayed_feature = data['x1'], data['x2'], data['displayed_feature']
+    feature_data = next((item for item in shape_functions_dict if item['name'] == displayed_feature), None)
     print(feature_data)
     if not feature_data:
         return jsonify({'error': 'Feature not found'}), 404
 
-    y_data = feature_current_state[selected_feature].copy()
+    y_data = feature_current_state[displayed_feature].copy()
 
     if feature_data['datatype'] == 'numerical':
         x_data = feature_data['x']
@@ -164,15 +169,13 @@ def setLinear():
         y_data[i] = y_data[index_start] + slope * (x_data[i] - x_data[index_start])
 
     print(index_start, index_end, slope)
-    feature_history[selected_feature].append(y_data)
-    feature_current_state[selected_feature] = y_data
-
-
+    feature_history[displayed_feature].append(y_data)
+    feature_current_state[displayed_feature] = y_data
 
     return jsonify({'y': y_data if feature_data['datatype'] != 'numerical' else y_data.tolist()})
 
 
-def perform_weighted_isotonic_regression(x_data, y_data, hist_counts, bin_edges, increasing=True):
+def weighted_isotonic_regression(x_data, y_data, hist_counts, bin_edges, increasing=True):
     # Determine the bin index for each x_data point
     bin_indices = np.digitize(x_data, bin_edges, right=True).astype(int)
     bin_indices = np.clip(bin_indices, 1, len(hist_counts))
@@ -189,25 +192,25 @@ def perform_weighted_isotonic_regression(x_data, y_data, hist_counts, bin_edges,
 @app.route('/monotonic_increase', methods=['POST'])
 def monotonic_increase():
     data = request.json
-    selected_feature = data['selected_feature']
+    displayed_feature = data['displayed_feature']
     x1, x2 = data['x1'], data['x2']
-    y_data_full = feature_current_state[selected_feature].copy()
+    y_data_full = feature_current_state[displayed_feature].copy()
 
-    selected_item = next(item for item in shape_functions_dict if item['name'] == selected_feature)
+    selected_item = next(item for item in shape_functions_dict if item['name'] == displayed_feature)
     # Numpy arrays are required for the IsotonicRegression package
     x_data = np.array(selected_item['x'])
     hist_data = np.array(selected_item['hist'].hist)
     bin_edges = np.array(selected_item['hist'].bin_edges)
 
     indices = np.where((x_data >= x1) & (x_data <= x2))[0]
-    y_pred_subset = perform_weighted_isotonic_regression(
+    y_pred_subset = weighted_isotonic_regression(
         x_data[indices], y_data_full[indices], hist_data, bin_edges, increasing=True)
 
     y_data_full[indices] = y_pred_subset
 
     # Update feature history and current state
-    feature_history[selected_feature].append(feature_current_state[selected_feature])
-    feature_current_state[selected_feature] = y_data_full
+    feature_history[displayed_feature].append(feature_current_state[displayed_feature])
+    feature_current_state[displayed_feature] = y_data_full
 
     return jsonify({'y': y_data_full.tolist()})
 
@@ -215,24 +218,24 @@ def monotonic_increase():
 @app.route('/monotonic_decrease', methods=['POST'])
 def monotonic_decrease():
     data = request.json
-    selected_feature = data['selected_feature']
+    displayed_feature = data['displayed_feature']
     x1, x2 = data['x1'], data['x2']
-    y_data_full = feature_current_state[selected_feature].copy()
+    y_data_full = feature_current_state[displayed_feature].copy()
 
-    selected_item = next(item for item in shape_functions_dict if item['name'] == selected_feature)
+    selected_item = next(item for item in shape_functions_dict if item['name'] == displayed_feature)
     # Numpy arrays are required for the IsotonicRegression package
     x_data = np.array(selected_item['x'])
     hist_data = np.array(selected_item['hist'].hist)
     bin_edges = np.array(selected_item['hist'].bin_edges)
 
     indices = np.where((x_data >= x1) & (x_data <= x2))[0]
-    y_pred_subset = perform_weighted_isotonic_regression(
+    y_pred_subset = weighted_isotonic_regression(
         x_data[indices], y_data_full[indices], hist_data, bin_edges, increasing=False)
 
     y_data_full[indices] = y_pred_subset
 
-    feature_history[selected_feature].append(feature_current_state[selected_feature])
-    feature_current_state[selected_feature] = y_data_full
+    feature_history[displayed_feature].append(feature_current_state[displayed_feature])
+    feature_current_state[displayed_feature] = y_data_full
 
     return jsonify({'y': y_data_full.tolist()})
 
@@ -242,7 +245,9 @@ def cubic_spline_interpolate():
     data = request.json
     # change name of selectedFeatures into features_to_incorporate
     selectedFeatures = data['selectedFeatures']
-    selected_feature = data['selected_feature']
+    displayed_feature = data['displayed_feature']
+    #feature_data = next((item for item in shape_functions_dict if item['name'] == displayed_feature), None)
+
     updated_data = {}
     for feature in shape_functions_dict:
         name = feature['name']
@@ -250,24 +255,31 @@ def cubic_spline_interpolate():
         if name in selectedFeatures:
             y_values = np.array(feature_current_state[name])
         else:
-            y_values = np.array(shape_functions_dict[name]['y'])
-    #feature_data_dict = next(item for item in shape_functions_dict if item['name'] == selected_feature)
+            y_values = feature['y']
+    #feature_data_dict = next(item for item in shape_functions_dict if item['name'] == displayed_feature)
         if feature['datatype'] == 'numerical':
             updated_data[name] = {'x': x_values, 'y': y_values.tolist(), 'datatype': 'numerical'}
         else:
             updated_data[name] = {'x': x_values, 'y': y_values, 'datatype': 'categorical'}
     #x_data = feature_data_dict['x'].tolist()
-    #y_data = feature_current_state[selected_feature].tolist()
-    adapter = model.adapt(selectedFeatures, updated_data, "spline", X_train, y_train)
-    replace_model(adapter)
-    #
-    x_data = shape_functions_dict[selected_feature]['x']
-    y_data = shape_functions_dict[selected_feature]['y']
-    return jsonify({'x': x_data, 'y': y_data.tolist()})
-def replace_model(new_model):
-    model = new_model
-    global shape_functions_dict
-    shape_functions_dict = model.get_shape_functions_as_dict()
+    #y_data = feature_current_state[displayed_feature].tolist()
+    model.adapt(selectedFeatures, updated_data, "spline_interpolation")
+    #shape_functions_dict = model.model.get_shape_functions_as_dict()
+    #load_data()
+    #eplace_model(adapter)
+    displayed_feature_data = next((item for item in model.get_shape_functions_as_dict() if item['name'] == displayed_feature), None)
+
+    x_data = displayed_feature_data['x']
+    y_data = displayed_feature_data['y']
+    return jsonify({'x': x_data.tolist(), 'y': y_data.tolist()})
+
+
+# def replace_model(new_model):
+#     model = new_model
+#     global shape_functions_dict
+#     shape_functions_dict = model.get_shape_functions_as_dict()
+
+
 
 
 
@@ -352,23 +364,9 @@ def retrain_feature():
     return jsonify({'y': feature_current_state[selected_feature].tolist()})
 
 
-@app.route('/update_model', methods=['POST'])
-def update_model():
-    data = request.json
-    selected_feature = data['selected_feature']
-    # TODO: Möglichkeit auswählen können
-    method = "spline"
-    list_of_features = [selected_feature]
 
-    model.adapt(list_of_features, feature_spline_state, X_train, y_train, method="spline")
 
-    y_train_pred = model.predict(X_train)
-    y_val_pred = model.predict(X_val)
 
-    mse_train = mean_squared_error(y_train, y_train_pred)
-    mse_val = mean_squared_error(y_val, y_val_pred)
-
-    return jsonify({'mse_train': mse_train, 'mse_val': mse_val})
 
 @app.route('/load_data_grid_instances', methods=['POST'])
 def load_data_grid_instances():

@@ -11,7 +11,7 @@ const layout = {
     autosize: true,
     responsive: true,
 };
-let selectedFeature = document.getElementById('feature-select').value;
+let displayedFeature = document.getElementById('display-feature').value;
 
 // Variables for counterfactual axis description
 const specificValue = 0.953; // Value from Table
@@ -60,24 +60,24 @@ function createHistogramPlot(hist_data, bin_edges) {
 
 
 document.addEventListener('DOMContentLoaded', function() {
-    const selectBox = document.getElementById('feature-select');
+    const selectBox = document.getElementById('display-feature');
     // Event listener for feature selection change
     selectBox.addEventListener('change', function () {
-        selectedFeature = selectBox.value;
-        fetchFeatureData(selectedFeature);
+        displayedFeature = selectBox.value;
+        fetchFeatureData(displayedFeature);
     });
     predictAndGetMetrics();
     //fetchFeatureData(selectBox.value);
     fetchDataAndCreateTable();
 });
 
-function fetchFeatureData(selected_feature) {
+function fetchFeatureData(displayedFeature) {
     fetch('/feature_data', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({selected_feature: selected_feature}),
+        body: JSON.stringify({displayed_feature: displayedFeature}),
     })
     .then(response => response.json())
     .then(data => {
@@ -148,7 +148,7 @@ function setConstantValue() {
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({x1: x1, x2: x2, new_y: newYValue, selected_feature: selectedFeature})
+        body: JSON.stringify({x1: x1, x2: x2, new_y: newYValue, displayed_feature: displayedFeature})
     })
     .then(response => response.json())
     .then(data => {
@@ -179,7 +179,7 @@ function setLinear() {
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({x1: x1, x2: x2, selected_feature: selectedFeature})
+        body: JSON.stringify({x1: x1, x2: x2, displayed_feature: displayedFeature})
     })
     .then(response => response.json())
     .then(data => {
@@ -203,7 +203,7 @@ function setMonotonicIncrease() {
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({x1: x1, x2: x2, selected_feature: selectedFeature})
+        body: JSON.stringify({x1: x1, x2: x2, displayed_feature: displayedFeature})
     })
     .then(response => response.json())
     .then(data => {
@@ -220,7 +220,7 @@ function setMonotonicDecrease() {
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({x1: x1, x2: x2, selected_feature: selectedFeature})
+        body: JSON.stringify({x1: x1, x2: x2, displayed_feature: displayedFeature})
     })
     .then(response => response.json())
     .then(data => {
@@ -228,43 +228,42 @@ function setMonotonicDecrease() {
     });
 }
 
-function CubicSplineInterpolation(selectedFeatures) {
-    const selectedFeature = document.getElementById('feature-select').value;
+function SplineInterpolation(selectedFeatures) {
+    const displayed_feature = document.getElementById('display-feature').value;
 
     fetch('/cubic_spline_interpolate', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ selectedFeature: selectedFeature, selectedFeatures: selectedFeatures })
+        body: JSON.stringify({ displayed_feature: displayed_feature, selectedFeatures: selectedFeatures })
     })
     .then(response => response.json())
     .then(data => {
         if (data.error) {
             alert('Error occurred: ' + data.error);
-        } else {
-            // If the spline interpolation was successful, add the new trace to the plot
-            var newTrace = {
-                x: data.x,
-                y: data.y,
-                type: 'scatter',
-                mode: 'lines',
-                name: 'Spline'
-            };
-
-            Plotly.addTraces('plot', newTrace);
+        }
+        else {
+            Plotly.update('plot', {
+                y: [data.y]
+            });
         }
     })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while processing your request.');
+    });
 }
 
+
 function retrainFeature() {
-    const selectedFeature = document.getElementById('feature-select').value;
+    const displayed_feature = document.getElementById('display-feature').value;;
     fetch('/retrain_feature', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({selected_feature: selectedFeature})
+        body: JSON.stringify({ displayed_feature: displayed_feature, selectedFeatures: selectedFeatures })
     })
     .then(response => response.json())
     .then(data => {
@@ -304,7 +303,7 @@ function resetGraph() {
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({selected_feature: selectedFeature})
+        body: JSON.stringify({displayed_feature: displayedFeature})
     })
     .then(response => response.json())
     .then(data => {
@@ -318,7 +317,7 @@ function undoLastChange() {
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({selected_feature: selectedFeature})
+        body: JSON.stringify({displayed_feature: displayedFeature})
     })
     .then(response => response.json())
     .then(data => {

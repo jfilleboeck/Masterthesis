@@ -19,9 +19,9 @@
     <link href="../static/css/style.css" rel="stylesheet">
 </head>
 <body class="container mt-5">
-    <label for="feature-select" class="mr-2">Select Feature:</label>
+    <label for="display-feature" class="mr-2">Display Feature:</label>
     <!-- Hier noch einfügen, dass das erste numerische Feature angezeigt wird -->
-    <select id="feature-select" class="form-control mr-2">
+    <select id="display-feature" class="form-control mr-2">
         <!-- Options will be dynamically populated -->
         {% for item in feature_names %}
         <option value="{{ item }}">{{ item }}</option>
@@ -65,7 +65,7 @@
                 });
             </script>
                 <div class="button-container" style="display: flex; flex-direction: column;">
-                    <button class="btn btn-info mb-2" onclick="CubicSplineInterpolation(selectedFeatures); return false;">Splines</button>
+                    <button class="btn btn-info mb-2" onclick="SplineInterpolation(selectedFeatures); return false;">Splines</button>
                     <button class="btn btn-info" onclick="retrainFeature(selectedFeatures); return false;">Retrain Feature</button>
                 </div>
             </form>

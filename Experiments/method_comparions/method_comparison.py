@@ -238,12 +238,12 @@ if __name__ == "__main__":
     #"Variations_ELM_Scale_10", "Variations_ElM_Scale_01",
     #experiments = ["Original", "Variations_ELM_Scale", "Synthetic_Data_20"]
     experiment = "Original"
-    linear_features = {"diabetes": ("regression", ["bmi", "bp", "s1", "s2", "s3", "s4"]),
-                        "titanic": ("classification", ["age", "fare"]),
-                        }
     # linear_features = {"diabetes": ("regression", ["bmi", "bp", "s1", "s2", "s3", "s4"]),
     #                     "titanic": ("classification", ["age", "fare"]),
-    #                     "adult": ("classification", ["education-num", "hours-per-week", "fnlwgt"])}
+    #                     }
+    linear_features = {"diabetes": ("regression", ["bmi", "bp", "s1", "s2", "s3", "s4"]),
+                        "titanic": ("classification", ["age", "fare"]),
+                        "adult": ("classification", ["education-num", "hours-per-week", "fnlwgt"])}
 
 
     folder_path = os.path.join(os.getcwd(), experiment)
@@ -294,7 +294,7 @@ if __name__ == "__main__":
                             y_values[y_values < 0] = most_negative
                             y_values[y_values > 0] = most_positive
                         else:
-                            y_values_modified = np.where(y_values != 0, 2*y_values, y_values)
+                            y_values = np.where(y_values != 0, 2*y_values, y_values)
 
                         synthetic_data_points_nr = 0
 
@@ -345,7 +345,7 @@ if __name__ == "__main__":
                 elif adjustment == "set to min/max":
                     mse_extreme = mse_change
                 else:
-                    mse_median = mse_change
+                    mse_doubling = mse_change
 
                  # plot Methode anpassen, dass es auserdem ein Feature Original gibt, bei dem kein roter Strich eingezeichnet wird
                  # außerdem soll unterdem Plot der MSE/F1 train/test angezeigt werden
@@ -353,17 +353,7 @@ if __name__ == "__main__":
                 # MITTAGSPAUSE: umändern zur Liste
                 adjusted_shape_function_tmp = adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)]
                 adjusted_shape_function_tmp['name'] = f"{feature_to_change} - {adjustment}"
-                shape_functions_for_plotting.append(adjusted_shape_function_tmp
-
-                                                    )
-                # adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)]['name']
-                # print(adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)])
-                # x_shape_function = adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)]['x']
-                # y_shape_function = adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)]['y']
-                # datatype_shape_function = adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)]['datatype']
-                # shape_functions_for_plotting.append({'name': f"{feature_to_change} - {adjustment}",
-                #                                      'x': x_shape_function, 'y': y_shape_function,
-                #                                      'datatype': datatype_shape_function})
+                shape_functions_for_plotting.append(adjusted_shape_function_tmp)
 
 
                 datatype = adjusted_shape_functions[adapter.model.feature_names.index(feature_to_change)]['datatype']

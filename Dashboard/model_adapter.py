@@ -193,6 +193,7 @@ class IGANNAdapter(IGANN):
                 spline = y_data
             spline_functions[feature_index] = spline
             features_selected_i.append(feature_index)
+
             # Required to adjust the predict_single method
         # Copy ELM Regressor
         new_regressors = []
