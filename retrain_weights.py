@@ -12,8 +12,8 @@ if __name__ == "__main__":
 
     # Load and split the data
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("adult")
-    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
-    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
+    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
+    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("adult")
 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     #features_to_change = ['sepal length (cm)', 'sepal width (cm)',  'petal length (cm)', 'petal width (cm)']
     #features_to_change = ['sepal length (cm)', 'sepal width (cm)']
-    #features_to_change = ['petal length (cm)', 'petal width (cm)']
+    features_to_change = ['petal length (cm)']
 
     #features_to_change = ['temp', 'atemp', 'hum', 'windspeed']
 
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     #features_to_change = ['sepal width (cm)']
     #features_to_change = ['temp']
     #features_to_change = ['bmi', 'bp', 'sex']
-    features_to_change = ['Age', 'Members', 'Sex']
+    #features_to_change = ['Age', 'Members', 'Sex']
     #features_to_change = ['education-num', 'workclass', 'marital-status', 'capital-loss']
     # Load feature data
     shape_functions_dict = adapter.model.get_shape_functions_as_dict()
@@ -81,12 +81,13 @@ if __name__ == "__main__":
                 #y_values = np.array(feature_current_state[name])
             else:
                 #y_values = np.where(np.array(feature_current_state[name]) < 0, -10, feature_current_state[name])
-                y_values = np.array(feature_current_state[name])
-                y_values = np.where(y_values < 0, -2, y_values)
-                y_values = np.where(y_values > 0, 2, y_values)
+                #y_values = np.array(feature_current_state[name])
+                y_values = np.ones_like(feature_current_state[name])
+                #y_values = np.where(y_values < 0, -2, y_values)
+                #y_values = np.where(y_values > 0, 2, y_values)
                 #updated_data[name] = {'x': x_values.tolist(), 'y': adjusted_y_values.tolist(),
                 #                      'datatype': 'numerical'}
-                synthetic_data_points_nr = 200
+                synthetic_data_points_nr = 00
                 new_x_values = []
                 new_y_values = []
                 #transformed_y_values = np.where(y_values < 0.8, 0.9, y_values)
@@ -128,7 +129,7 @@ if __name__ == "__main__":
     # updated_data == feature-current_state; anpassen für kategorische Werte
     # Als erstes möchte ich eine Liste von features to change übergeben
 
-    adapter = adapter.adapt(features_to_change, updated_data, "feature_retraining", X_train, y_train)
+    adapter = adapter.adapt(features_to_change, updated_data, "feature_retraining")
 
     y_train_pred = adapter.predict(X_train)
     y_test_pred = adapter.predict(X_test)
