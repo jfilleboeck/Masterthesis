@@ -24,11 +24,10 @@ app = Flask(__name__)
 
 
 def load_data():
-    global shape_functions_dict, feature_history, feature_current_state, feature_spline_state
+    global shape_functions_dict, feature_history, feature_current_state
     shape_functions_dict = model.get_shape_functions_as_dict()
     feature_history = {}
     feature_current_state = {}
-    feature_spline_state = {}
 
     for feature in shape_functions_dict:
         name = feature['name']
@@ -36,7 +35,6 @@ def load_data():
 
         feature_history[name] = [y_value]
         feature_current_state[name] = y_value
-        feature_spline_state[name] = y_value
 
 
 def encode_categorical_data(categories):
@@ -182,11 +180,26 @@ def weighted_isotonic_regression(x_data, y_data, hist_counts, bin_edges, increas
 
     weights = np.array([hist_counts[index - 1] for index in bin_indices])
 
-    iso_reg = IsotonicRegression(increasing=increasing)
+    iso_reg = IsotonicRegression(increasing=increasing, out_of_bounds="clip")
     iso_reg.fit(x_data, y_data, sample_weight=weights)
     y_pred = iso_reg.predict(x_data)
 
+    if increasing:
+        if y_pred[0] < y_data[0]:
+            y_pred[0] = y_data[0]
+            # Ensure the rest of the predictions maintain monotonicity
+            for i in range(1, len(y_pred)):
+                y_pred[i] = max(y_pred[i], y_pred[i-1])
+    else:
+        if y_pred[0] < y_data[0]:
+            y_pred[0] = y_data[0]
+            # Ensure the rest of the predictions maintain monotonicity
+            for i in range(1, len(y_pred)):
+                y_pred[i] = min(y_pred[i], y_pred[i-1])
     return y_pred
+
+
+
 
 
 @app.route('/monotonic_increase', methods=['POST'])
@@ -339,20 +352,20 @@ def get_original_data():
     global feature_history, feature_current_state, feature_spline_state
 
     data = request.json
-    selected_feature = data['selected_feature']
+    displayed_feature = data['displayed_feature']
 
     # Obtain the original data for the selected feature
     model = ModelAdapter(task)
     model.fit(X_train, y_train)
-    original_data = next(item for item in model.get_shape_functions_as_dict() if item['name'] == selected_feature)
+    original_data = next(item for item in model.get_shape_functions_as_dict() if item['name'] == displayed_feature)
     original_y = original_data['y']
 
     # Reset the current state and history for the selected feature
-    feature_current_state[selected_feature] = original_y
-    feature_history[selected_feature] = [original_y.copy()]  # Reset history with the original state
+    feature_current_state[displayed_feature] = original_y
+    feature_history[displayed_feature] = [original_y.copy()]  # Reset history with the original state
 
     # Resetting feature_spline_state if necessary
-    feature_spline_state[selected_feature] = original_y
+    feature_spline_state[displayed_feature] = original_y
 
     # Prepare data for response
     x_data = original_data['x'].tolist()

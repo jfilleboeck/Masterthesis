@@ -62,70 +62,7 @@ class IGANNAdapter(IGANN):
         super(IGANNAdapter, self).__init__(*args, **kwargs)
         self.features_adapted = False
 
-    def _get_pred_of_i(self, i, x_values=None):
-        if x_values == None:
-            feat_values = self.unique[i]
-        else:
-            feat_values = x_values[i]
-        if self.task == "classification":
-            pred = self.init_classifier.coef_[0, i] * feat_values
-        else:
-            pred = self.init_classifier.coef_[i] * feat_values
-        feat_values = feat_values.to(self.device)
-        single_prediction_index_0 = []
-        pred_overall_index_0 = []
-        single_prediction_index_7 = []
-        pred_overall_index_7 = []
-        single_prediction_index_20 = []
-        pred_overall_index_20 = []
-        for regressor, boost_rate in zip(self.regressors, self.boosting_rates):
-            single_prediction = regressor.predict_single(feat_values.reshape(-1, 1), i).squeeze()
-            pred += (boost_rate * single_prediction).cpu()
-            if self.features_adapted:
-                single_prediction_index_0.append(single_prediction[0].item())
-                single_prediction_index_7.append(single_prediction[7].item())
-                single_prediction_index_20.append(single_prediction[20].item())
-                pred_overall_index_0.append(pred[0].item())
-                pred_overall_index_7.append(pred[7].item())
-                pred_overall_index_20.append(pred[20].item())
 
-        if self.features_adapted:
-            if i == 0:
-                plt.figure(figsize=(10, 6))
-                plt.scatter(range(len(single_prediction_index_0)), single_prediction_index_0, label='single_prediction', color='red')
-                plt.scatter(range(len(pred_overall_index_0)), pred_overall_index_0,
-                            label='overall_prediction', color='blue')
-                plt.title('Prediction process for the first x value')
-                plt.xlabel('Iteration')
-                plt.ylabel('Value')
-                plt.legend()
-                plt.grid(True)
-                plt.show()
-
-                plt.figure(figsize=(10, 6))
-                plt.scatter(range(len(single_prediction_index_7)), single_prediction_index_7, label='single_prediction', color='red')
-                plt.scatter(range(len(pred_overall_index_7)), pred_overall_index_7,
-                            label='overall_prediction', color='blue')
-                plt.title('Prediction process for the middle x value')
-                plt.xlabel('Iteration')
-                plt.ylabel('Value')
-                plt.legend()
-                plt.grid(True)
-                plt.show()
-
-                plt.figure(figsize=(10, 6))
-                plt.scatter(range(len(single_prediction_index_20)), single_prediction_index_20, label='single_prediction',
-                            color='red')
-                plt.scatter(range(len(pred_overall_index_20)), pred_overall_index_20,
-                            label='overall_prediction', color='blue')
-                plt.title('Prediction process for the last x value')
-                plt.xlabel('Iteration')
-                plt.ylabel('Value')
-                plt.legend()
-                plt.grid(True)
-                plt.show()
-                self.features_adapted = False
-        return feat_values, pred
 
     def encode_categorical_data(self, features_to_change, updated_data):
         features_to_change_extended = []
@@ -169,26 +106,13 @@ class IGANNAdapter(IGANN):
             #print(x.shape)
             y = torch.tensor(updated_data[feature]['y'], dtype=torch.float32)
             # Initialize lists to store the first and middle value for plotting
-            y_values_index_0 = []
-            train_regressor_pred_index_0 = []
-            y_hat_index_0 = []
-            y_tilde_index_0 = []
 
-            y_values_index_7 = []
-            train_regressor_pred_index_7 = []
-            y_hat_index_7 = []
-            y_tilde_index_7 = []
-
-            y_values_index_20 = []
-            train_regressor_pred_index_20 = []
-            y_hat_index_20 = []
-            y_tilde_index_20 = []
             if self.task == "classification":
                 y_hat = torch.tensor(self.init_classifier.coef_[0, i] * x.numpy(), dtype=torch.float64)
                 #y_hat = torch.tensor(y_hat, dtype=torch.float64)
             else:
                 # + self.init_classifier.intercept_
-                y_hat = self.init_classifier.coef_[i] * x.numpy() + self.init_classifier.intercept_
+                y_hat = self.init_classifier.coef_[i] * x.numpy()
             n_categorical_cols = 1 if updated_data[feature]['datatype'] == 'categorical' else 0
             for counter, regressor in enumerate(self.regressors):
                 if updated_data[feature]['datatype'] == 'numerical':
@@ -198,15 +122,6 @@ class IGANNAdapter(IGANN):
                     else:
                          y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat).to(dtype=torch.float32)
 
-                    y_values_index_0.append(y[0].item())
-                    y_hat_index_0.append(y_hat[0])
-                    y_tilde_index_0.append(y_tilde[0])
-                    y_values_index_7.append(y[7].item())
-                    y_hat_index_7.append(y_hat[7])
-                    y_tilde_index_7.append(y_tilde[7])
-                    y_values_index_20.append(y[20].item())
-                    y_hat_index_20.append(y_hat[20])
-                    y_tilde_index_20.append(y_tilde[20])
 
                     hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
                     # y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat).to(
@@ -216,7 +131,7 @@ class IGANNAdapter(IGANN):
                         n_categorical_cols=n_categorical_cols,
                         n_hid=self.n_hid,
                         seed=1,
-                        elm_scale=100,
+                        elm_scale=1,
                         # 0.002
                         elm_alpha=1,
                         act=self.act,
@@ -246,9 +161,7 @@ class IGANNAdapter(IGANN):
                     else:
                         train_regressor_pred = new_regressor.predict(X_hid, hidden=True).squeeze()
 
-                    train_regressor_pred_index_0.append(train_regressor_pred[0].item())
-                    train_regressor_pred_index_7.append(train_regressor_pred[7].item())
-                    train_regressor_pred_index_20.append(train_regressor_pred[20].item())
+
                     # Update the prediction for training and validation data
                     y_hat = torch.tensor(y_hat, dtype=torch.float64)
                     y_hat += self.boost_rate * train_regressor_pred
@@ -265,49 +178,7 @@ class IGANNAdapter(IGANN):
                     regressor.output_model.coef_[i * self.n_hid: (i + 1) * self.n_hid] = new_weight
 
 
-            plt.figure(figsize=(10, 6))
-            plt.scatter(range(len(y_values_index_0)), y_values_index_0, label='y', color='blue')
-            plt.scatter(range(len(train_regressor_pred_index_0)), train_regressor_pred_index_0,
-                        label='train_regressor_pred', color='red')
-            plt.scatter(range(len(y_hat_index_0)), y_hat_index_0, label='y_hat (before update)',
-                        color='green')
-            plt.scatter(range(len(y_tilde_index_0)), y_tilde_index_0, label='y_tilde', color='orange')
-            plt.title('Prediction process for the first x value')
-            plt.xlabel('Iteration')
-            plt.ylabel('Value')
-            plt.legend()
-            plt.grid(True)
-            plt.show()
 
-            plt.figure(figsize=(10, 6))
-            plt.scatter(range(len(y_values_index_7)), y_values_index_7, label='y', color='blue')
-            plt.scatter(range(len(train_regressor_pred_index_7)), train_regressor_pred_index_7,
-                        label='train_regressor_pred', color='red')
-            plt.scatter(range(len(y_hat_index_7)), y_hat_index_7, label='y_hat (before update)',
-                        color='green')
-            plt.scatter(range(len(y_tilde_index_7)), y_tilde_index_7, label='y_tilde', color='orange')
-
-            plt.title('Prediction process for the middle x value')
-            plt.xlabel('Iteration')
-            plt.ylabel('Value')
-            plt.legend()
-            plt.grid(True)
-            plt.show()
-
-            plt.figure(figsize=(10, 6))
-            plt.scatter(range(len(y_values_index_20)), y_values_index_20, label='y', color='blue')
-            plt.scatter(range(len(train_regressor_pred_index_20)), train_regressor_pred_index_20,
-                        label='train_regressor_pred', color='red')
-            plt.scatter(range(len(y_hat_index_20)), y_hat_index_20, label='y_hat (before update)',
-                        color='green')
-            plt.scatter(range(len(y_tilde_index_20)), y_tilde_index_20, label='y_tilde', color='orange')
-
-            plt.title('Prediction process for the last x value')
-            plt.xlabel('Iteration')
-            plt.ylabel('Value')
-            plt.legend()
-            plt.grid(True)
-            plt.show()
 
 
 
