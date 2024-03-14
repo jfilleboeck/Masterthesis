@@ -369,15 +369,8 @@ function createTable(data) {
         data: data,
         layout: "fitColumns",
         columns: generateColumns(data),
-        rowClick: function(e, row) {
-            // Remove highlight class from all rows
-            table.getRows().forEach(function(r) {
-                r.getElement().classList.remove("highlighted-row");
-            });
-            // Add highlight class to the clicked row
-            row.getElement().classList.add("highlighted-row");
-        },
     });
+    console.log(data);
 }
 
 
@@ -387,7 +380,7 @@ function fetchDataAndCreateTable() {
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({type_of_data: 'initial'})
+        body: JSON.stringify({})
     })
     .then(response => {
         if (!response.ok) {

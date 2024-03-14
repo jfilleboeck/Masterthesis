@@ -1,6 +1,4 @@
-.control-panel {
-    margin-top: 20px;
-}
+
 #plot {
     margin-top: 30px;
 }
@@ -13,29 +11,27 @@
     overflow-y: auto;
 }
 
-/*#histogram-plot {*/
-/*    height: 200px;
-/*}*/
+
 
 .highlighted-row {
     background-color: #f0f0f0;
 }
 
-#dynamic-table thead th {
+#datagrid-table {
+    table-layout: auto;
+    /* Add any other styles for #datagrid-table here to keep them organized and in one place */
+}
+
+#datagrid-table thead th {
     position: sticky;
     top: 0;
     background-color: white;
     z-index: 1;
 }
 
-#dynamic-table td {
+#datagrid-table td {
     height: 10px;
     vertical-align: middle;
-}
-
-
-#dynamic-table {
-    table-layout: auto;
 }
 
 
@@ -62,3 +58,5 @@
     flex-direction: column;
     gap: 10px; /* Adjust gap between buttons if needed */
 }
+
+

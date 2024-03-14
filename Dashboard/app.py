@@ -357,6 +357,7 @@ def get_original_data():
     # Obtain the original data for the selected feature
     model = ModelAdapter(task)
     model.fit(X_train, y_train)
+    load_data()
     original_data = next(item for item in model.get_shape_functions_as_dict() if item['name'] == displayed_feature)
     original_y = original_data['y']
 
@@ -388,21 +389,37 @@ def undo_last_change():
         return jsonify({'error': 'No more changes to undo for feature ' + selected_feature}), 400
 
 
-
-
-
-
-
 @app.route('/load_data_grid_instances', methods=['POST'])
 def load_data_grid_instances():
-    data = request.json
-    if data and data.get('type_of_data') == 'initial':
-        combined_data = pd.concat([X_val.reset_index(drop=True), y_val.reset_index(drop=True)], axis=1)
-        combined_data = combined_data.round(3)
-        rows = combined_data.to_dict(orient='records')
-        return jsonify(rows)
+    X_val_preprocessed = model.model._preprocess_feature_matrix(X_val, fit_dummies=True)
+    X_val_preprocessed_df = pd.DataFrame(X_val_preprocessed.numpy())
 
-    return jsonify({'error': 'Invalid request'}), 400
+    # Round numerical values to three decimal places
+    X_val_preprocessed_df = X_val_preprocessed_df.round(3)
+
+    y_val_reset = y_val.reset_index(drop=True)
+
+    # Concatenate along the columns to get a single DataFrame
+    combined_data = pd.concat([X_val_preprocessed_df, y_val_reset], axis=1)
+
+    # Ensure that the target variable (or any other numerical columns in y_val_reset) is rounded as well
+    combined_data = combined_data.round(3)
+
+    combined_data.insert(0, 'ID', combined_data.index)
+
+    # Convert DataFrame to dictionary with rounded numerical values
+    rows = combined_data.to_dict(orient='records')
+    for row in rows:
+        for key, value in row.items():
+            if isinstance(value, float):
+                row[key] = round(value, 3)  # Ensure rounding persists in the dictionary
+
+    for i, feature_name in enumerate(model.feature_names):
+        for row in rows:
+            if i in row:
+                row[feature_name] = row.pop(i)
+
+    return jsonify(rows)
 
 
 @app.route('/order_by_nearest', methods=['POST'])
