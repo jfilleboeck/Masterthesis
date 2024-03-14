@@ -364,11 +364,44 @@ function generateColumns(data) {
 }
 
 // Function to create the table
+// Variable to store the selected row ID
+let selectedRowId = null;
+
 function createTable(data) {
     var table = new Tabulator("#datagrid-table", {
         data: data,
         layout: "fitColumns",
         columns: generateColumns(data),
+        // Define the context menu for each row
+        rowContextMenu: [
+            {
+                label:"Order by nearest neighbor",
+                action: function(e, row){
+                    e.preventDefault(); // prevent the browser's context menu from appearing
+                    selectedRowId = row.getData().ID; // store the row ID
+                    // Code to order by nearest neighbor here
+                    console.log("Ordering by nearest neighbor for ID:", selectedRowId);
+                }
+            },
+            {
+                label:"Add to plot 1",
+                action: function(e, row){
+                    e.preventDefault();
+                    selectedRowId = row.getData().ID;
+                    // Code to add to plot 1 here
+                    console.log("Adding to plot 1, ID:", selectedRowId);
+                }
+            },
+            {
+                label:"Add to plot 2",
+                action: function(e, row){
+                    e.preventDefault();
+                    selectedRowId = row.getData().ID;
+                    // Code to add to plot 2 here
+                    console.log("Adding to plot 2, ID:", selectedRowId);
+                }
+            },
+        ],
     });
     console.log(data);
 }
