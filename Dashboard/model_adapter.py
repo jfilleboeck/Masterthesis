@@ -19,12 +19,12 @@ class ModelAdapter():
     def fit(self, X_train, y_train):
         self.model.fit(X_train, y_train)
 
-    def adapt(self, features_to_change, updated_data, method):
+    def adapt(self, features_to_change, updated_data, method, hyperparamethers=None):
         if self.model_name == "IGANN":
             if method == "feature_retraining":
-                self.model.feature_retraining(features_to_change, updated_data)
+                self.model.feature_retraining(features_to_change, updated_data, hyperparamethers=hyperparamethers)
             if method == "spline_interpolation":
-                self.model.spline_interpolation(features_to_change, updated_data)
+                self.model.spline_interpolation(features_to_change, updated_data, hyperparamethers=hyperparamethers)
         return self.model
 
     def plot_single(self, plot_by_list=None, show_n=5):
@@ -93,16 +93,47 @@ class IGANNAdapter(IGANN):
                 updated_data_extended[feature] = updated_data[feature]
         return features_to_change_extended, updated_data_extended
 
-    def feature_retraining(self, features_to_change, updated_data):
-        #self.features_adapted = True
+    def create_synthetic_data(self, nr_synthetic_data_points, features_to_change, updated_data):
+        for feature in features_to_change:
+            new_x_values = []
+            new_y_values = []
+            x_values = updated_data[feature]['x']
+            y_values = updated_data[feature]['y']
+            for i in range(len(x_values) - 1):
+                new_x_values.append(x_values[i])
+                new_y_values.append(y_values[i])
+                # Calculate steps for synthetic points
+                x_step = (x_values[i + 1] - x_values[i]) / (nr_synthetic_data_points + 1)
+                y_step = (y_values[i + 1] - y_values[i]) / (nr_synthetic_data_points + 1)
+                #
+                for j in range(1, nr_synthetic_data_points + 1):
+                    synthetic_x = x_values[i] + j * x_step
+                    synthetic_y = y_values[i] + j * y_step
+                    new_x_values.append(synthetic_x)
+                    new_y_values.append(synthetic_y)
+            #
+            #    # Don't forget to add the last original point
+            new_x_values.append(x_values[-1])
+            new_y_values.append(y_values[-1])
+            updated_data[feature]['x'] = new_x_values
+            updated_data[feature]['y'] = new_y_values
+        return updated_data
+
+    def feature_retraining(self, features_to_change, updated_data, hyperparamethers=None):
+        if hyperparamethers is not None and isinstance(hyperparamethers, list):
+            nr_synthetic_data_points = hyperparamethers[0]
+            if nr_synthetic_data_points > 0:
+                updated_data = self.create_synthetic_data(nr_synthetic_data_points, features_to_change, updated_data)
+            elm_scale = hyperparamethers[1]
+            elm_alpha = hyperparamethers[2]
+        else:
+            elm_scale = self.elm_scale
+            elm_alpha = self.elm_alpha
         features_to_change, updated_data = self.encode_categorical_data(features_to_change, updated_data)
         # change next line to updated_selected_features
         for feature in features_to_change:
             i = self.feature_names.index(feature)
             x = torch.tensor(updated_data[feature]['x'], dtype=torch.float32)
-            print(x[0].item())
-            print(x[7].item())
-            print(x[20].item())
             #print(x.shape)
             y = torch.tensor(updated_data[feature]['y'], dtype=torch.float32)
             # Initialize lists to store the first and middle value for plotting
@@ -130,10 +161,10 @@ class IGANNAdapter(IGANN):
                         n_input=1,
                         n_categorical_cols=n_categorical_cols,
                         n_hid=self.n_hid,
-                        seed=1,
-                        elm_scale=1,
+                        seed=0,
+                        elm_scale=elm_scale,
                         # 0.002
-                        elm_alpha=1,
+                        elm_alpha=elm_alpha,
                         act=self.act,
                         device=self.device,
                     )
@@ -182,7 +213,7 @@ class IGANNAdapter(IGANN):
 
 
 
-    def spline_interpolation(self, features_to_change, updated_data):
+    def spline_interpolation(self, features_to_change, updated_data, hyperparamethers=None):
         self.spline_interpolation_run = True
         features_to_change, updated_data = self.encode_categorical_data(features_to_change, updated_data)
         # create cubic spline

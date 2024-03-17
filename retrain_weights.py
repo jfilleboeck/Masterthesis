@@ -81,8 +81,8 @@ if __name__ == "__main__":
                 #y_values = np.array(feature_current_state[name])
             else:
                 #y_values = np.where(np.array(feature_current_state[name]) < 0, -10, feature_current_state[name])
-                #y_values = np.array(feature_current_state[name])
-                y_values = np.ones_like(feature_current_state[name])
+                y_values = np.array(feature_current_state[name])
+                #y_values = np.ones_like(feature_current_state[name])
                 #y_values = np.where(y_values < 0, -2, y_values)
                 #y_values = np.where(y_values > 0, 2, y_values)
                 #updated_data[name] = {'x': x_values.tolist(), 'y': adjusted_y_values.tolist(),
@@ -91,33 +91,8 @@ if __name__ == "__main__":
                 new_x_values = []
                 new_y_values = []
                 #transformed_y_values = np.where(y_values < 0.8, 0.9, y_values)
-                transformed_y_values = np.where(y_values < 0, -2, y_values)
-                if synthetic_data_points_nr > 0:
-                    for i in range(len(x_values) - 1):
-                        new_x_values.append(x_values[i])
-                        new_y_values.append(transformed_y_values[i])
-                        # Calculate steps for synthetic points
-                        x_step = (x_values[i + 1] - x_values[i]) / (synthetic_data_points_nr + 1)
-                        y_step = (transformed_y_values[i + 1] - transformed_y_values[i]) / (synthetic_data_points_nr + 1)
-                        #
-                        for j in range(1, synthetic_data_points_nr + 1):
-                            synthetic_x = x_values[i] + j * x_step
-                            synthetic_y = transformed_y_values[i] + j * y_step if transformed_y_values[i] != -10 else -10
-                            new_x_values.append(synthetic_x)
-                            new_y_values.append(synthetic_y)
-                #
-                #    # Don't forget to add the last original point
-                    new_x_values.append(x_values[-1])
-                    new_y_values.append(transformed_y_values[-1])
-                    x_values = new_x_values
-                    y_values= new_y_values
-                else:
-                     y_values = transformed_y_values
-                     print("No synthetic points")
-                #                       'datatype': 'numerical'}
-        else:
-            # Use the original 'y' values from shape_functions_dict if there is no user change
-            y_values = feature['y']
+                y_values = np.where(y_values < 0, -2, y_values)
+
 
         if feature['datatype'] == 'numerical':
             updated_data[name] = {'x': x_values, 'y': y_values, 'datatype': 'numerical'}
@@ -129,7 +104,7 @@ if __name__ == "__main__":
     # updated_data == feature-current_state; anpassen für kategorische Werte
     # Als erstes möchte ich eine Liste von features to change übergeben
 
-    adapter = adapter.adapt(features_to_change, updated_data, "feature_retraining")
+    adapter = adapter.adapt(features_to_change, updated_data, "feature_retraining", hyperparamethers=[2, 1, 1])
 
     y_train_pred = adapter.predict(X_train)
     y_test_pred = adapter.predict(X_test)
