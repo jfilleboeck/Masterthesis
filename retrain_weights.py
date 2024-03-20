@@ -12,14 +12,16 @@ if __name__ == "__main__":
 
     # Load and split the data
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("adult")
-    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
+    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
-    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
-   #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("adult")
-
+    X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
+    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("cal_housing")
+    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("bike")
+    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("mpg")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
+    adapter = ModelAdapter(task, elm_alpha=0.001)
 
-    adapter = ModelAdapter(task)
+    #adapter = ModelAdapter(task, elm_alpha=0.01)
     adapter.fit(X_train, y_train)
 
     # Calculate and print mean squared error
@@ -39,14 +41,18 @@ if __name__ == "__main__":
 
     #features_to_change = ['sepal length (cm)', 'sepal width (cm)',  'petal length (cm)', 'petal width (cm)']
     #features_to_change = ['sepal length (cm)', 'sepal width (cm)']
-    features_to_change = ['petal length (cm)']
+    #features_to_change = ['petal length (cm)']
 
     #features_to_change = ['temp', 'atemp', 'hum', 'windspeed']
 
 
     #features_to_change = ['sepal width (cm)']
     #features_to_change = ['temp']
-    #features_to_change = ['bmi', 'bp', 'sex']
+    features_to_change = ['bmi', 'bp', "age", "s1", "s2", "s3", "s4", "s5", "s6"]
+    #features_to_change =['MedInc', 'HouseAge', 'AveRooms', 'AveBedrms', 'Population', 'AveOccup', 'Latitude', 'Longitude']
+    #features_to_change = ["cylinders", "horsepower", "weight", "acceleration", "model_year", "displacement", "origin"]
+    #features_to_change = ['temp', 'atemp', 'hum', 'windspeed']
+
     #features_to_change = ['Age', 'Members', 'Sex']
     #features_to_change = ['education-num', 'workclass', 'marital-status', 'capital-loss']
     # Load feature data
@@ -70,6 +76,7 @@ if __name__ == "__main__":
     for feature in shape_functions_dict:
         name = feature['name']
         x_values = feature['x']
+        y_values = feature['y']
         if name in features_to_change:
             # Simulate user input (by setting negative values to 0); in flask app just use feature_current_state
             if feature["datatype"] == "categorical":
@@ -87,11 +94,10 @@ if __name__ == "__main__":
                 #y_values = np.where(y_values > 0, 2, y_values)
                 #updated_data[name] = {'x': x_values.tolist(), 'y': adjusted_y_values.tolist(),
                 #                      'datatype': 'numerical'}
-                synthetic_data_points_nr = 00
-                new_x_values = []
-                new_y_values = []
                 #transformed_y_values = np.where(y_values < 0.8, 0.9, y_values)
-                y_values = np.where(y_values < 0, -2, y_values)
+                #y_values = np.where(y_values < 0, -2, y_values)
+                y_values[:] = 1
+
 
 
         if feature['datatype'] == 'numerical':
@@ -104,7 +110,7 @@ if __name__ == "__main__":
     # updated_data == feature-current_state; anpassen für kategorische Werte
     # Als erstes möchte ich eine Liste von features to change übergeben
 
-    adapter = adapter.adapt(features_to_change, updated_data, "feature_retraining", hyperparamethers=[2, 1, 1])
+    adapter = adapter.adapt(features_to_change, updated_data, "feature_retraining", hyperparamethers=[0, 100, 1])
 
     y_train_pred = adapter.predict(X_train)
     y_test_pred = adapter.predict(X_test)
@@ -139,16 +145,16 @@ if __name__ == "__main__":
     # print(adapter.feature_names)
 
     #pred_new = np.array([0, 0, 0, 0, 0])
-    pred_new = torch.tensor([0, 0, 0, 0, 0, 0, 0], dtype=torch.float)
+    pred_new = torch.tensor([0, 0, 0], dtype=torch.float)
 
     #pred_new = pred.tolist()
-    # for regressor, boost_rate in zip(adapter.regressors, adapter.boosting_rates):
-    #     pred_new += (
-    #         boost_rate
-    #         * regressor.predict_single((torch.tensor([-2, -1.7, -1.3, -1, 0 , 1, 2], dtype=torch.float)).reshape(-1, 1), i).squeeze()
-    #     ).cpu()
-    # #print("Prediction Regressoren: ")
-    #print(pred_new)
+    for regressor, boost_rate in zip(adapter.regressors, adapter.boosting_rates):
+        pred_new += (
+            boost_rate
+            * regressor.predict_single((torch.tensor([-1, 0.01, 1], dtype=torch.float)).reshape(-1, 1), i).squeeze()
+        ).cpu()
+    #print("Prediction Regressoren: ")
+    print(pred_new)
 
     # for regressor, boost_rate in zip(adapter.regressors, adapter.boosting_rates):
     #     pred_new += (

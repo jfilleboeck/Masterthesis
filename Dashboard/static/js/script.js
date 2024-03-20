@@ -228,6 +228,36 @@ function setMonotonicDecrease() {
     });
 }
 
+function setSmooth() {
+    const x1 = parseFloat(document.getElementById('x1-value').value);
+    const x2 = parseFloat(document.getElementById('x2-value').value);
+
+    // Store the current x-axis and y-axis range
+    const gd = document.getElementById('plot');
+    const currentXAxisRange = gd.layout.xaxis.range;
+    const currentYAxisRange = gd.layout.yaxis.range;
+
+
+    fetch('/setSmooth', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({x1: x1, x2: x2, displayed_feature: displayedFeature})
+    })
+    .then(response => response.json())
+    .then(data => {
+        Plotly.update('plot', {y: [data.y]}).then(() => {
+            // Reapply the stored range values to maintain the zoom level
+            Plotly.relayout(gd, {
+                'xaxis.range': currentXAxisRange,
+                'yaxis.range': currentYAxisRange
+            });
+        });
+    });
+}
+
+
 function SplineInterpolation(selectedFeatures) {
     const displayed_feature = document.getElementById('display-feature').value;
 
@@ -246,6 +276,8 @@ function SplineInterpolation(selectedFeatures) {
         else {
             Plotly.update('plot', {
                 y: [data.y]
+            }).then(() => {
+                predictAndGetMetrics();
             });
         }
     })
@@ -257,20 +289,34 @@ function SplineInterpolation(selectedFeatures) {
 
 
 function retrainFeature(selectedFeatures) {
+    document.getElementById('retrainFeatureModal').style.display = 'block';
+}
+
+// New function to send retrain request
+function sendRetrainRequest() {
     const displayed_feature = document.getElementById('display-feature').value;
+    const elmScale = document.getElementById('elmScale').value;
+    const elmAlpha = document.getElementById('elmAlpha').value;
+    const nrSyntheticDataPoints = document.getElementById('nrSyntheticDataPoints').value;
+
     fetch('/retrain_feature', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ displayed_feature: displayed_feature, selectedFeatures: selectedFeatures })
+        body: JSON.stringify({
+            displayed_feature: displayed_feature,
+            selectedFeatures: selectedFeatures,
+            elmScale: elmScale,
+            elmAlpha: elmAlpha,
+            nrSyntheticDataPoints: nrSyntheticDataPoints
+        })
     })
     .then(response => response.json())
     .then(data => {
         if (data.error) {
             alert('Error occurred: ' + data.error);
-        }
-        else {
+        } else {
             Plotly.update('plot', {
                 y: [data.y]
             });
@@ -279,9 +325,15 @@ function retrainFeature(selectedFeatures) {
     .catch(error => {
         console.error('Error:', error);
         alert('An error occurred while processing your request.');
+    }).then(() => {
+        predictAndGetMetrics();
+        document.getElementById('retrainFeatureModal').style.display = 'none'; // Hide the popup after the request
     });
 }
 
+function closeModal() {
+    document.getElementById('retrainFeatureModal').style.display = 'none';
+}
 
 function predictAndGetMetrics() {
     fetch('/predict_and_get_metrics')
@@ -376,12 +428,29 @@ function createTable(data) {
         rowContextMenu: [
             {
                 label:"Order by nearest neighbor",
-                action: function(e, row){
-                    e.preventDefault(); // prevent the browser's context menu from appearing
-                    selectedRowId = row.getData().ID; // store the row ID
-                    // Code to order by nearest neighbor here
-                    console.log("Ordering by nearest neighbor for ID:", selectedRowId);
-                }
+                action: function (e, row) {
+                        e.preventDefault(); // Prevent the browser's context menu from appearing
+                        const selectedRowId = row.getData().ID; // Store the row ID
+                        const tableData = table.getData(); // Get all table data
+
+                        // Send request to backend
+                        fetch('/path/to/order_by_nearest', { // Replace '/path/to/order_by_nearest' with your actual backend endpoint
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                data: tableData,
+                                selectedRowId: selectedRowId
+                            }),
+                        })
+                        .then(response => response.json())
+                        .then(orderedData => {
+                            // Update the table with the newly ordered data
+                            table.setData(orderedData);
+                        })
+                        .catch(error => console.error('Error:', error));
+                    }
             },
             {
                 label:"Add to plot 1",

@@ -4,17 +4,18 @@ import numpy as np
 from igann.igann import ELM_Regressor
 from scipy.interpolate import CubicSpline
 from matplotlib import pyplot as plt
-
+import warnings
+warnings.filterwarnings('ignore')
 
 class ModelAdapter():
     # This class contains all the methods, which the backend requires
     # It distributes the methods to the correct method of the ML models
     # using object composition
 
-    def __init__(self, task, model="IGANN"):
+    def __init__(self, task, model="IGANN",  *args, **kwargs):
         self.model_name = model
         if self.model_name == "IGANN":
-            self.model = IGANNAdapter(task=task)
+            self.model = IGANNAdapter(task=task,  *args, **kwargs)
 
     def fit(self, X_train, y_train):
         self.model.fit(X_train, y_train)
@@ -62,6 +63,70 @@ class IGANNAdapter(IGANN):
         super(IGANNAdapter, self).__init__(*args, **kwargs)
         self.features_adapted = False
 
+    def _get_pred_of_i(self, i, x_values=None):
+        if x_values == None:
+            feat_values = self.unique[i]
+        else:
+            feat_values = x_values[i]
+        if self.task == "classification":
+            pred = self.init_classifier.coef_[0, i] * feat_values
+        else:
+            pred = self.init_classifier.coef_[i] * feat_values
+        feat_values = feat_values.to(self.device)
+        single_prediction_index_0 = []
+        pred_overall_index_0 = []
+        single_prediction_index_7 = []
+        pred_overall_index_7 = []
+        single_prediction_index_20 = []
+        pred_overall_index_20 = []
+        for regressor, boost_rate in zip(self.regressors, self.boosting_rates):
+            single_prediction = regressor.predict_single(feat_values.reshape(-1, 1), i).squeeze()
+            pred += (boost_rate * single_prediction).cpu()
+            # if self.features_adapted:
+            #     single_prediction_index_0.append(single_prediction[0].item())
+            #     single_prediction_index_7.append(single_prediction[7].item())
+            #     single_prediction_index_20.append(single_prediction[20].item())
+            #     pred_overall_index_0.append(pred[0].item())
+            #     pred_overall_index_7.append(pred[7].item())
+            #     pred_overall_index_20.append(pred[20].item())
+
+        if self.features_adapted:
+            if i == 0:
+                # plt.figure(figsize=(10, 6))
+                # plt.scatter(range(len(single_prediction_index_0)), single_prediction_index_0, label='single_prediction', color='red')
+                # plt.scatter(range(len(pred_overall_index_0)), pred_overall_index_0,
+                #             label='overall_prediction', color='blue')
+                # plt.title('Prediction process for the first x value')
+                # plt.xlabel('Iteration')
+                # plt.ylabel('Value')
+                # plt.legend()
+                # plt.grid(True)
+                # plt.show()
+                #
+                # plt.figure(figsize=(10, 6))
+                # plt.scatter(range(len(single_prediction_index_7)), single_prediction_index_7, label='single_prediction', color='red')
+                # plt.scatter(range(len(pred_overall_index_7)), pred_overall_index_7,
+                #             label='overall_prediction', color='blue')
+                # plt.title('Prediction process for the middle x value')
+                # plt.xlabel('Iteration')
+                # plt.ylabel('Value')
+                # plt.legend()
+                # plt.grid(True)
+                # plt.show()
+                #
+                # plt.figure(figsize=(10, 6))
+                # plt.scatter(range(len(single_prediction_index_20)), single_prediction_index_20, label='single_prediction',
+                #             color='red')
+                # plt.scatter(range(len(pred_overall_index_20)), pred_overall_index_20,
+                #             label='overall_prediction', color='blue')
+                # plt.title('Prediction process for the last x value')
+                # plt.xlabel('Iteration')
+                # plt.ylabel('Value')
+                # plt.legend()
+                # plt.grid(True)
+                # plt.show()
+                self.features_adapted = False
+        return feat_values, pred
 
 
     def encode_categorical_data(self, features_to_change, updated_data):
@@ -120,12 +185,26 @@ class IGANNAdapter(IGANN):
         return updated_data
 
     def feature_retraining(self, features_to_change, updated_data, hyperparamethers=None):
-        if hyperparamethers is not None and isinstance(hyperparamethers, list):
-            nr_synthetic_data_points = hyperparamethers[0]
+        self.features_adapted = True
+        print(f"Hyperparameter: {hyperparamethers}")
+        if hyperparamethers is not None:
+            # Try to cast hyperparameters to int, if fail then cast to float.
+            try:
+                elm_scale = int(hyperparamethers[0])
+            except ValueError:
+                elm_scale = float(hyperparamethers[0])
+
+            try:
+                elm_alpha = int(hyperparamethers[1])
+            except ValueError:
+                elm_alpha = float(hyperparamethers[1])
+            print(elm_scale)
+            print(type(elm_scale))
+            print(elm_alpha)
+            print(type(elm_alpha))
+            nr_synthetic_data_points = int(hyperparamethers[2])
             if nr_synthetic_data_points > 0:
                 updated_data = self.create_synthetic_data(nr_synthetic_data_points, features_to_change, updated_data)
-            elm_scale = hyperparamethers[1]
-            elm_alpha = hyperparamethers[2]
         else:
             elm_scale = self.elm_scale
             elm_alpha = self.elm_alpha
@@ -134,9 +213,26 @@ class IGANNAdapter(IGANN):
         for feature in features_to_change:
             i = self.feature_names.index(feature)
             x = torch.tensor(updated_data[feature]['x'], dtype=torch.float32)
+            #print(x[0].item())
+            #print(x[7].item())
+            #print(x[20].item())
             #print(x.shape)
             y = torch.tensor(updated_data[feature]['y'], dtype=torch.float32)
             # Initialize lists to store the first and middle value for plotting
+            # y_values_index_0 = []
+            # train_regressor_pred_index_0 = []
+            # y_hat_index_0 = []
+            # y_tilde_index_0 = []
+            #
+            # y_values_index_7 = []
+            # train_regressor_pred_index_7 = []
+            # y_hat_index_7 = []
+            # y_tilde_index_7 = []
+            #
+            # y_values_index_20 = []
+            # train_regressor_pred_index_20 = []
+            # y_hat_index_20 = []
+            # y_tilde_index_20 = []
 
             if self.task == "classification":
                 y_hat = torch.tensor(self.init_classifier.coef_[0, i] * x.numpy(), dtype=torch.float64)
@@ -147,11 +243,23 @@ class IGANNAdapter(IGANN):
             n_categorical_cols = 1 if updated_data[feature]['datatype'] == 'categorical' else 0
             for counter, regressor in enumerate(self.regressors):
                 if updated_data[feature]['datatype'] == 'numerical':
+
                     if self.task == "classification":
                         y_tilde = torch.sqrt(torch.tensor(0.5)) * (torch.tensor((y - y_hat), dtype=torch.float64))
 
                     else:
-                         y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat).to(dtype=torch.float32)
+                        y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * self._get_y_tilde(y, y_hat).to(dtype=torch.float32)
+                        #y_tilde = torch.sqrt(torch.tensor(0.5).to(self.device)) * (torch.tensor((y - y_hat), dtype=torch.float32))
+
+                    # y_values_index_0.append(y[0].item())
+                    # y_hat_index_0.append(y_hat[0])
+                    # y_tilde_index_0.append(y_tilde[0])
+                    # y_values_index_7.append(y[7].item())
+                    # y_hat_index_7.append(y_hat[7])
+                    # y_tilde_index_7.append(y_tilde[7])
+                    # y_values_index_20.append(y[20].item())
+                    # y_hat_index_20.append(y_hat[20])
+                    # y_tilde_index_20.append(y_tilde[20])
 
 
                     hessian_train_sqrt = self._loss_sqrt_hessian(y, y_hat)
@@ -192,6 +300,10 @@ class IGANNAdapter(IGANN):
                     else:
                         train_regressor_pred = new_regressor.predict(X_hid, hidden=True).squeeze()
 
+                    # train_regressor_pred_index_0.append(train_regressor_pred[0].item())
+                    # train_regressor_pred_index_7.append(train_regressor_pred[7].item())
+                    # train_regressor_pred_index_20.append(train_regressor_pred[20].item())
+
 
                     # Update the prediction for training and validation data
                     y_hat = torch.tensor(y_hat, dtype=torch.float64)
@@ -201,12 +313,58 @@ class IGANNAdapter(IGANN):
                     regressor.hidden_mat[i, i * self.n_hid: (i + 1) * self.n_hid] = new_regressor.hidden_mat.squeeze()
                     regressor.output_model.coef_[
                     i * self.n_hid: (i + 1) * self.n_hid] = new_regressor.output_model.coef_
+                    print("In Retrain Weights")
+
                 else:
                     # for categorical features only update the weight
                     # train_regressor_pred = torch.from_numpy(y) * X[:, i]
                     share_of_init_classifier = np.array(y_hat / len(self.regressors))
                     new_weight = (y / len(self.regressors) - share_of_init_classifier) * (1 / self.boosting_rates[counter])
                     regressor.output_model.coef_[i * self.n_hid: (i + 1) * self.n_hid] = new_weight
+
+            # plt.figure(figsize=(10, 6))
+            # plt.scatter(range(len(y_values_index_0)), y_values_index_0, label='y', color='blue')
+            # plt.scatter(range(len(train_regressor_pred_index_0)), train_regressor_pred_index_0,
+            #             label='train_regressor_pred', color='red')
+            # plt.scatter(range(len(y_hat_index_0)), y_hat_index_0, label='y_hat (before update)',
+            #             color='green')
+            # plt.scatter(range(len(y_tilde_index_0)), y_tilde_index_0, label='y_tilde', color='orange')
+            # plt.title('Prediction process for the first x value')
+            # plt.xlabel('Iteration')
+            # plt.ylabel('Value')
+            # plt.legend()
+            # plt.grid(True)
+            # plt.show()
+            #
+            # plt.figure(figsize=(10, 6))
+            # plt.scatter(range(len(y_values_index_7)), y_values_index_7, label='y', color='blue')
+            # plt.scatter(range(len(train_regressor_pred_index_7)), train_regressor_pred_index_7,
+            #             label='train_regressor_pred', color='red')
+            # plt.scatter(range(len(y_hat_index_7)), y_hat_index_7, label='y_hat (before update)',
+            #             color='green')
+            # plt.scatter(range(len(y_tilde_index_7)), y_tilde_index_7, label='y_tilde', color='orange')
+            #
+            # plt.title('Prediction process for the middle x value')
+            # plt.xlabel('Iteration')
+            # plt.ylabel('Value')
+            # plt.legend()
+            # plt.grid(True)
+            # plt.show()
+            #
+            # plt.figure(figsize=(10, 6))
+            # plt.scatter(range(len(y_values_index_20)), y_values_index_20, label='y', color='blue')
+            # plt.scatter(range(len(train_regressor_pred_index_20)), train_regressor_pred_index_20,
+            #             label='train_regressor_pred', color='red')
+            # plt.scatter(range(len(y_hat_index_20)), y_hat_index_20, label='y_hat (before update)',
+            #             color='green')
+            # plt.scatter(range(len(y_tilde_index_20)), y_tilde_index_20, label='y_tilde', color='orange')
+            #
+            # plt.title('Prediction process for the last x value')
+            # plt.xlabel('Iteration')
+            # plt.ylabel('Value')
+            # plt.legend()
+            # plt.grid(True)
+            # plt.show()
 
 
 
@@ -301,6 +459,8 @@ class ELM_Regressor_Spline(ELM_Regressor):
         """
         This function makes a full prediction with the model for a given input X.
         """
+        print("features, selected:")
+        print(self.features_selected_i)
         if hidden:
             X_hid = X
         else:
@@ -375,6 +535,11 @@ class ELM_Regressor_Spline(ELM_Regressor):
                 if isinstance(out, np.ndarray):
                     out = torch.from_numpy(out).float()
             else:
+                print(i)
+                print()
+                print(self.spline_functions)
+                print()
+                print(x)
                 prediction = torch.from_numpy(self.spline_functions[i]) * x
                 # out = (prediction / self.n_regressors * (1/self.boosting_rates[self.index_regressor])
                 #        - pred_init_classifier/self.n_regressors)

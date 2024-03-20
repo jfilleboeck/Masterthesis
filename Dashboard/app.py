@@ -1,3 +1,5 @@
+import math
+
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import numpy as np
@@ -79,9 +81,7 @@ def feature_data():
             hist_data = feature_data['hist'].hist.tolist()
             bin_edges = feature_data['hist'].bin_edges.tolist()
             #display feature kann entfernet werden
-            print(jsonify({'is_numeric': True, 'x': x_data, 'y': y_data,
-                            'displayed_feature': displayed_feature,
-                            'hist_data': hist_data, 'bin_edges': bin_edges}))
+
             return jsonify({'is_numeric': True, 'x': x_data, 'y': y_data,
                             'displayed_feature': displayed_feature,
                             'hist_data': hist_data, 'bin_edges': bin_edges})
@@ -134,7 +134,8 @@ def setConstantValue():
     feature_history[displayed_feature].append(y_data)
     feature_current_state[displayed_feature] = y_data
 
-    return jsonify({'y': y_data if feature_data['datatype'] != 'numerical' else y_data.tolist()})
+    return jsonify({'y': [float(y) for y in y_data] if feature_data['datatype'] != 'numerical' else [float(y) for y in
+                                                                                                     y_data.tolist()]})
 
 
 @app.route('/setLinear', methods=['POST'])
@@ -142,7 +143,7 @@ def setLinear():
     data = request.json
     x1, x2, displayed_feature = data['x1'], data['x2'], data['displayed_feature']
     feature_data = next((item for item in shape_functions_dict if item['name'] == displayed_feature), None)
-    print(feature_data)
+
     if not feature_data:
         return jsonify({'error': 'Feature not found'}), 404
 
@@ -166,7 +167,6 @@ def setLinear():
     for i in range(index_start, index_end + 1):
         y_data[i] = y_data[index_start] + slope * (x_data[i] - x_data[index_start])
 
-    print(index_start, index_end, slope)
     feature_history[displayed_feature].append(y_data)
     feature_current_state[displayed_feature] = y_data
 
@@ -252,6 +252,42 @@ def monotonic_decrease():
 
     return jsonify({'y': y_data_full.tolist()})
 
+@app.route('/setSmooth', methods=['POST'])
+def setSmooth():
+    data = request.json
+    x1, x2, displayed_feature = data['x1'], data['x2'], data['displayed_feature']
+    window_size = 5
+    feature_data = next((item for item in shape_functions_dict if item['name'] == displayed_feature), None)
+    data = request.json
+    x1, x2, displayed_feature = data['x1'], data['x2'], data['displayed_feature']
+    feature_data = next((item for item in shape_functions_dict if item['name'] == displayed_feature), None)
+    if not feature_data:
+        return jsonify({'error': 'Feature not found'}), 404
+
+
+    y_data = feature_current_state[displayed_feature].copy()
+
+    if feature_data['datatype'] == 'numerical':
+        x_data = feature_data['x']
+    else:
+        x_data = encode_categorical_data(feature_data['x'])
+
+    # Find indices for x1 and x2
+    index_start = min(range(len(x_data)), key=lambda i: abs(x_data[i]-x1))
+    index_end = min(range(len(x_data)), key=lambda i: abs(x_data[i]-x2))
+    #index_start, index_end = sorted([index_x1, index_x2])
+
+    # Simple Moving Average
+    smoothed_y = y_data.copy()
+    for i in range(index_start, index_end + 1):
+        window_indices = range(max(i - window_size // 2, 0), min(i + window_size // 2 + 1, len(y_data)))
+        smoothed_y[i] = sum(y_data[j] for j in window_indices) / len(window_indices)
+
+    feature_history[displayed_feature].append(smoothed_y)
+    feature_current_state[displayed_feature] = smoothed_y
+
+    return jsonify({'y': smoothed_y if feature_data['datatype'] != 'numerical' else smoothed_y.tolist()})
+
 
 @app.route('/cubic_spline_interpolate', methods=['POST'])
 def cubic_spline_interpolate():
@@ -283,8 +319,13 @@ def cubic_spline_interpolate():
 
     x_data = displayed_feature_data['x']
     y_data = displayed_feature_data['y']
-    return jsonify({'x': x_data.tolist(), 'y': y_data.tolist()})
+    x_data_to_return = x_data.tolist() if not isinstance(x_data, list) else x_data
+    y_data_to_return = y_data.tolist() if not isinstance(y_data, list) else y_data
+    x_data_to_return = [float(x) for x in x_data_to_return]
+    y_data_to_return = [float(y) for y in y_data_to_return]
 
+
+    return jsonify({'x': x_data_to_return, 'y': y_data_to_return})
 
 # def replace_model(new_model):
 #     model = new_model
@@ -297,6 +338,12 @@ def retrain_feature():
     data = request.json
     selectedFeatures = data['selectedFeatures']
     displayed_feature = data['displayed_feature']
+    elmScale = data['elmScale']
+    elmAlpha = data['elmAlpha']
+    nrSyntheticDataPoints = data['nrSyntheticDataPoints']
+
+
+    print(selectedFeatures)
 
     updated_data = {}
     for feature in shape_functions_dict:
@@ -313,7 +360,7 @@ def retrain_feature():
             updated_data[name] = {'x': x_values, 'y': y_values, 'datatype': 'categorical'}
     # x_data = feature_data_dict['x'].tolist()
     # y_data = feature_current_state[displayed_feature].tolist()
-    model.adapt(selectedFeatures, updated_data, "feature_retraining")
+    model.adapt(selectedFeatures, updated_data, "feature_retraining", (elmScale, elmAlpha, nrSyntheticDataPoints))
     # shape_functions_dict = model.model.get_shape_functions_as_dict()
     # load_data()
     # replace_model(adapter)
@@ -322,8 +369,13 @@ def retrain_feature():
 
     x_data = displayed_feature_data['x']
     y_data = displayed_feature_data['y']
-    return jsonify({'x': x_data.tolist(), 'y': y_data.tolist()})
+    x_data_to_return = x_data.tolist() if not isinstance(x_data, list) else x_data
+    y_data_to_return = y_data.tolist() if not isinstance(y_data, list) else y_data
+    x_data_to_return = [float(x) for x in x_data_to_return]
+    y_data_to_return = [float(y) for y in y_data_to_return]
 
+
+    return jsonify({'x': x_data_to_return, 'y': y_data_to_return})
 
 
 
@@ -365,28 +417,30 @@ def get_original_data():
     feature_current_state[displayed_feature] = original_y
     feature_history[displayed_feature] = [original_y.copy()]  # Reset history with the original state
 
-    # Resetting feature_spline_state if necessary
-    feature_spline_state[displayed_feature] = original_y
 
     # Prepare data for response
-    x_data = original_data['x'].tolist()
-    y_data = original_y.tolist()
+    x_data = original_data['x']
+    y_data = original_y
+    x_data_to_return = x_data.tolist() if not isinstance(x_data, list) else x_data
+    y_data_to_return = y_data.tolist() if not isinstance(y_data, list) else y_data
+    x_data_to_return = [float(x) for x in x_data_to_return]
+    y_data_to_return = [float(y) for y in y_data_to_return]
 
-    return jsonify({'x': x_data, 'y': y_data})
+    return jsonify({'x': x_data_to_return, 'y': y_data_to_return})
 
 
 @app.route('/undo_last_change', methods=['POST'])
 def undo_last_change():
     data = request.json
-    selected_feature = data['selected_feature']
+    displayed_feature = data['displayed_feature']
 
-    if selected_feature in feature_history and len(feature_history[selected_feature]) > 1:
-        feature_current_state[selected_feature] = feature_history[
-            selected_feature].pop()  # Revert to the previous state and remove the last change
-        y_data = feature_current_state[selected_feature]  # Update y_data to the reverted state
+    if displayed_feature in feature_history and len(feature_history[displayed_feature]) > 1:
+        feature_current_state[displayed_feature] = feature_history[
+            displayed_feature].pop()  # Revert to the previous state and remove the last change
+        y_data = feature_current_state[displayed_feature]  # Update y_data to the reverted state
         return jsonify({'y': y_data.tolist()})
     else:
-        return jsonify({'error': 'No more changes to undo for feature ' + selected_feature}), 400
+        return jsonify({'error': 'No more changes to undo for feature ' + displayed_feature}), 400
 
 
 @app.route('/load_data_grid_instances', methods=['POST'])
@@ -421,44 +475,61 @@ def load_data_grid_instances():
 
     return jsonify(rows)
 
+@app.route('/instance_explanation', methods=['POST'])
+def instance_explanation():
+    data = request.json['data']
+    selectedRowId = request.json['selectedRowId']
+    # mit Auswahl Button die prediction für diese Zeile durchführen (wenn ausgewählt, dann wird auch predicted)
+    # per Rechtsklick kann man den Auswahl Button triggern
+    # {
+    #     "ID": 0,
+    #     "age": 0.953,
+    #     "bmi": -0.13,
+    #     "bp": -0.336,
+    #     "s1": 2.628,
+    #     "s2": 2.632,
+    #     "s3": 0.403,
+    #     "s4": 0.721,
+    #     "s5": 0.682,
+    #     "s6": -0.11,
+    #     "sex_w": 0,
+    #     "target": 0.867
+    # }
+    intercept = model.model.init_classifier.intercept_
+    # als erstes ID und target cutten
 
-@app.route('/order_by_nearest', methods=['POST'])
+    # für jedes dieser features den x wert nehmen und i mittels feature names bestimmen
+
+    if task == "classification":
+        contribution = torch.tensor(model.model.init_classifier.coef_[0, i] * x.numpy(), dtype=torch.float64)
+        # y_hat = torch.tensor(y_hat, dtype=torch.float64)
+    else:
+        # + self.init_classifier.intercept_
+        contribution = model.model.init_classifier.coef_[i] * x.numpy()
+
+    # zurückschicken ans frontend: dictionary aus
+
+def calculate_distance(row1, row2):
+    distance = 0.0
+    keys = list(row1.keys())
+    # Exclude the first ('ID') and last columns from the keys to be considered in the calculation
+    for key in keys[1:-1]:
+        if key in row2:
+            distance += (row1[key] - row2[key]) ** 2
+    return math.sqrt(distance)
+
+@app.route('/path/to/order_by_nearest', methods=['POST'])
 def order_by_nearest():
-    X_val.reset_index(drop=True, inplace=True)
-    y_val.reset_index(drop=True, inplace=True)
-    # Step 1: Identify categorical and numeric columns
-    categorical_features = X_val.select_dtypes(include=['object']).columns.tolist()
-    numeric_features = X_val.select_dtypes(exclude=['object']).columns.tolist()
+    data = request.json['data']
+    selectedRowId = request.json['selectedRowId']
+    selectedRow = next(item for item in data if item['ID'] == selectedRowId)
 
-    # Step 2: One-Hot Encode categorical columns
-    encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
-    categorical_encoded = encoder.fit_transform(X_val[categorical_features])
-    categorical_encoded_df = pd.DataFrame(categorical_encoded,
-                                          columns=encoder.get_feature_names_out(categorical_features),
-                                          index=X_val.index)  # Retain original index
+    # Calculate distances to the selected row and sort
+    for item in data:
+        item['distance'] = calculate_distance(item, selectedRow)
+    orderedData = sorted(data, key=lambda x: x['distance'])
 
-    # Combine encoded categorical data with numeric data for nearest neighbor analysis
-    X_val_numeric = X_val[numeric_features]
-    X_val_preprocessed = pd.concat([X_val_numeric, categorical_encoded_df], axis=1)
-
-    # Step 3: Fit NearestNeighbors and calculate neighbors
-    nbrs = NearestNeighbors(n_neighbors=len(X_val_preprocessed)).fit(X_val_preprocessed)
-    distances, indices = nbrs.kneighbors(X_val_preprocessed)
-
-    # Reorder X_val and y_val based on the sorted indices of the nearest neighbors
-    sorted_indices = indices[:, 1]  # Assuming you want to sort based on the closest neighbor
-    # Use original index to ensure alignment
-    original_indices = X_val_preprocessed.index[sorted_indices]
-    sorted_data_original = X_val.loc[original_indices]
-
-    # Align y_val with the sorted X_val
-    sorted_y_val = y_val.loc[original_indices]
-
-    # Convert the sorted data to JSON, including y_val
-    sorted_data_original['target'] = sorted_y_val.values  # Direct assignment using values to avoid index misalignment
-    sorted_data_json = sorted_data_original.to_dict(orient='records')
-
-    return jsonify(sorted_data_json)
+    return jsonify(orderedData)
 
 if __name__ == '__main__':
     app.run(debug=True)

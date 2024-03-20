@@ -1,250 +1,47 @@
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
 import numpy as np
-
-# Create a class to handle drag events for the curve segment
-class DraggableCurveSegment:
-    def __init__(self, ax, x, y, sensitivity=1.0):
-        self.ax = ax
-        self.x = x
-        self.y = y
-        self.sensitivity = sensitivity
-        self.line, = ax.plot(x, y, c='blue', label='Curve')
-        self.press = None
-        self.background = None
-        self.connect()
-
-    def connect(self):
-        self.cid_press = self.line.figure.canvas.mpl_connect('button_press_event', self.on_press)
-        self.cid_release = self.line.figure.canvas.mpl_connect('button_release_event', self.on_release)
-        self.cid_motion = self.line.figure.canvas.mpl_connect('motion_notify_event', self.on_motion)
-
-    def closest_point(self, x, y):
-        dist = (self.x - x)**2 + (self.y - y)**2
-        return np.argmin(dist)
-
-    def on_press(self, event):
-        if event.inaxes != self.line.axes: return
-        idx = self.closest_point(event.xdata, event.ydata)
-        self.press = idx, event.xdata, event.ydata
-        self.background = self.line.figure.canvas.copy_from_bbox(self.line.axes.bbox)
-
-    def on_motion(self, event):
-        if self.press is None: return
-        if event.inaxes != self.line.axes: return
-        idx, x_press, y_press = self.press
-        dy = event.ydata - y_press
-        # Update the curve segment smoothly based on sensitivity
-        for i in range(len(self.y)):
-            weight = np.exp(-self.sensitivity * abs(i - idx))
-            self.y[i] += dy * weight
-        self.line.set_data(self.x, self.y)
-        self.line.figure.canvas.restore_region(self.background)
-        self.line.axes.draw_artist(self.line)
-        self.line.figure.canvas.blit(self.line.axes.bbox)
-
-    def on_release(self, event):
-        self.press = None
-        self.line.figure.canvas.draw()
+from sklearn.metrics import mean_squared_error
 
 
-# Create a class to handle drag events for the curve segment using Linear Weighting
-class DraggableCurveLinearWeight:
-    def __init__(self, ax, x, y, radius=10):
-        self.ax = ax
-        self.x = x
-        self.y = y
-        self.radius = radius  # Number of points affected around the clicked point
-        self.line, = ax.plot(x, y, c='blue', label='Curve')
-        self.press = None
-        self.background = None
-        self.connect()
+y_hat_original = np.array([-0.41933826, -0.39834073, -0.3898806, -0.3856364, -0.3813824, -0.37284395, -0.36855882, -0.36426273, -0.35563627, -0.35130525, -0.3469619, -0.33823645, -0.3338537, -0.32945704, -0.32504612, -0.32062033, -0.31617945, -0.31172284, -0.30276063, -0.2982541, -0.2937298, -0.28918737, -0.28462616, -0.28004554, -0.27544498, -0.27082387, -0.2661815, -0.26151723, -0.25212032, -0.24738628, -0.24262746, -0.23784308, -0.22332871, -0.21843392, -0.21350935, -0.20855397, -0.20356683, -0.19854696, -0.19349328, -0.18840468, -0.18328008, -0.17811835, -0.17291825, -0.1676785, -0.16239795, -0.15170887, -0.14629762, -0.14083989, -0.13533427, -0.12977915, -0.12417296, -0.11851399, -0.11280052, -0.10703078, -0.10120294, -0.09531508, -0.08936524, -0.08335137, -0.07727136, -0.07112306, -0.06490418, -0.05861242, -0.05224536, -0.0458005, -0.03927526, -0.03266699, -0.02597292, -0.0191902, -0.01231588, -0.0053469, 0.00171288, 0.0087039, 0.0155627, 0.02229448, 0.02890422, 0.03539668, 0.04177643, 0.05421514, 0.06028229, 0.06625318, 0.07213148, 0.08362433, 0.08924551, 0.0947874, 0.10025299, 0.10564512, 0.11096656, 0.11621994, 0.1214078, 0.12653254, 0.13159652, 0.13660191, 0.14155093, 0.1464456, 0.15128793, 0.1608229, 0.16551913, 0.17017016, 0.17477758, 0.18386768, 0.18835331, 0.19280115, 0.19721252, 0.20158873, 0.205931, 0.21024042, 0.2145182, 0.2187654, 0.22298308, 0.2271722, 0.23133375, 0.23957787, 0.24772242, 0.25577393, 0.2597667, 0.2637384, 0.27553403, 0.27942824, 0.28330457, 0.29483202, 0.30243763, 0.3062182, 0.3099844, 0.31373683, 0.31747577, 0.3212018, 0.32491523, 0.32861644, 0.34695193, 0.35058722, 0.36503264, 0.3757736, 0.40056503, 0.40407875, 0.40758616, 0.42850554, 0.44579184, 0.44923466, 0.45953697, 0.48683485, 0.4936237, 0.50039977, 0.50378317, 0.5307491, 0.6041728, ])
 
-    def connect(self):
-        self.cid_press = self.line.figure.canvas.mpl_connect('button_press_event', self.on_press)
-        self.cid_release = self.line.figure.canvas.mpl_connect('button_release_event', self.on_release)
-        self.cid_motion = self.line.figure.canvas.mpl_connect('motion_notify_event', self.on_motion)
-
-    def closest_point(self, x, y):
-        dist = (self.x - x)**2 + (self.y - y)**2
-        return np.argmin(dist)
-
-    def on_press(self, event):
-        if event.inaxes != self.line.axes: return
-        idx = self.closest_point(event.xdata, event.ydata)
-        self.press = idx, event.xdata, event.ydata
-        self.background = self.line.figure.canvas.copy_from_bbox(self.line.axes.bbox)
-
-    def on_motion(self, event):
-        if self.press is None: return
-        if event.inaxes != self.line.axes: return
-        idx, x_press, y_press = self.press
-        dy = event.ydata - y_press
-        # Update the curve segment smoothly based on radius
-        for i in range(max(0, idx - self.radius), min(len(self.y), idx + self.radius + 1)):
-            weight = 1 - abs(i - idx) / self.radius
-            self.y[i] += dy * weight
-        self.line.set_data(self.x, self.y)
-        self.line.figure.canvas.restore_region(self.background)
-        self.line.axes.draw_artist(self.line)
-        self.line.figure.canvas.blit(self.line.axes.bbox)
-
-    def on_release(self, event):
-        self.press = None
-        self.line.figure.canvas.draw()
-
-
-# Create a class to handle drag events for the curve segment using Fixed Range
-class DraggableCurveFixedRange:
-    def __init__(self, ax, x, y, range_size=10):
-        self.ax = ax
-        self.x = x
-        self.y = y
-        self.range_size = range_size  # Number of points affected around the clicked point
-        self.line, = ax.plot(x, y, c='blue', label='Curve')
-        self.press = None
-        self.background = None
-        self.connect()
-
-    def connect(self):
-        self.cid_press = self.line.figure.canvas.mpl_connect('button_press_event', self.on_press)
-        self.cid_release = self.line.figure.canvas.mpl_connect('button_release_event', self.on_release)
-        self.cid_motion = self.line.figure.canvas.mpl_connect('motion_notify_event', self.on_motion)
-
-    def closest_point(self, x, y):
-        dist = (self.x - x)**2 + (self.y - y)**2
-        return np.argmin(dist)
-
-    def on_press(self, event):
-        if event.inaxes != self.line.axes: return
-        idx = self.closest_point(event.xdata, event.ydata)
-        self.press = idx, event.xdata, event.ydata
-        self.background = self.line.figure.canvas.copy_from_bbox(self.line.axes.bbox)
-
-    def on_motion(self, event):
-        if self.press is None: return
-        if event.inaxes != self.line.axes: return
-        idx, x_press, y_press = self.press
-        dy = event.ydata - y_press
-        # Update the curve segment based on a fixed range
-        for i in range(max(0, idx - self.range_size), min(len(self.y), idx + self.range_size + 1)):
-            self.y[i] += dy
-        self.line.set_data(self.x, self.y)
-        self.line.figure.canvas.restore_region(self.background)
-        self.line.axes.draw_artist(self.line)
-        self.line.figure.canvas.blit(self.line.axes.bbox)
-
-    def on_release(self, event):
-        self.press = None
-        self.line.figure.canvas.draw()
-
-
-
-# Create a class to handle drag events for the curve segment using Gaussian Weighting
-class DraggableCurveGaussianWeight:
-    def __init__(self, ax, x, y, sigma=5):
-        self.ax = ax
-        self.x = x
-        self.y = y
-        self.sigma = sigma  # Standard deviation for Gaussian function
-        self.line, = ax.plot(x, y, c='blue', label='Curve')
-        self.press = None
-        self.background = None
-        self.connect()
-
-    def connect(self):
-        self.cid_press = self.line.figure.canvas.mpl_connect('button_press_event', self.on_press)
-        self.cid_release = self.line.figure.canvas.mpl_connect('button_release_event', self.on_release)
-        self.cid_motion = self.line.figure.canvas.mpl_connect('motion_notify_event', self.on_motion)
-
-    def closest_point(self, x, y):
-        dist = (self.x - x)**2 + (self.y - y)**2
-        return np.argmin(dist)
-
-    def on_press(self, event):
-        if event.inaxes != self.line.axes: return
-        idx = self.closest_point(event.xdata, event.ydata)
-        self.press = idx, event.xdata, event.ydata
-        self.background = self.line.figure.canvas.copy_from_bbox(self.line.axes.bbox)
-
-    def on_motion(self, event):
-        if self.press is None: return
-        if event.inaxes != self.line.axes: return
-        idx, x_press, y_press = self.press
-        dy = event.ydata - y_press
-        # Update the curve segment smoothly based on Gaussian weighting
-        for i in range(len(self.y)):
-            weight = np.exp(-((i - idx) ** 2) / (2 * self.sigma ** 2))
-            self.y[i] += dy * weight
-        self.line.set_data(self.x, self.y)
-        self.line.figure.canvas.restore_region(self.background)
-        self.line.axes.draw_artist(self.line)
-        self.line.figure.canvas.blit(self.line.axes.bbox)
-
-    def on_release(self, event):
-        self.press = None
-        self.line.figure.canvas.draw()
+y_hat_synthetisch = np.array([-0.41199002, -0.39152366, -0.38333443, -0.379238, -0.3751398, -0.3669369, -0.3628313, -0.35872245, -0.35049295, -0.3463714, -0.34224463, -0.3339733, -0.3298276, -0.3256744, -0.32151312, -0.317343, -0.3131634, -0.30897367, -0.3005606, -0.29633567, -0.29209742, -0.2878449, -0.28357717, -0.27929333, -0.27499238, -0.2706733, -0.26633495, -0.26197627, -0.25319308, -0.24876612, -0.24431385, -0.23983485, -0.22622329, -0.2216227, -0.21698777, -0.21231668, -0.20760766, -0.20285884, -0.19806829, -0.19323395, -0.18835376, -0.1834255, -0.17844698, -0.17341574, -0.16832943, -0.15798122, -0.15271395, -0.14738083, -0.14197883, -0.136505, -0.13095605, -0.12532873, -0.11961962, -0.11382512, -0.10794154, -0.10196503, -0.09589162, -0.08971718, -0.08343741, -0.07704783, -0.07054383, -0.06392065, -0.05717325, -0.05029651, -0.04328505, -0.03613331, -0.02883552, -0.0213857, -0.01377764, -0.0060049, 0.00192896, 0.00979152, 0.01748833, 0.0250251, 0.03240736, 0.03964043, 0.0467294, 0.0604947, 0.06718039, 0.07374071, 0.08017995, 0.09271157, 0.09881173, 0.10480644, 0.11069927, 0.11649369, 0.12219299, 0.1278004, 0.13331902, 0.13875182, 0.1441017, 0.14937143, 0.15456372, 0.15968119, 0.16472629, 0.17460904, 0.17945136, 0.1842305, 0.18894865, 0.19820988, 0.20275685, 0.20725055, 0.21169272, 0.21608515, 0.22042939, 0.22472712, 0.22897984, 0.23318908, 0.2373563, 0.24148288, 0.24557014, 0.25363198, 0.2615519, 0.269339, 0.27318555, 0.27700216, 0.2882819, 0.2919884, 0.29566953, 0.3065697, 0.31372494, 0.31727132, 0.32079783, 0.32430512, 0.3277938, 0.33126464, 0.33471814, 0.3381549, 0.35510713, 0.358455, 0.37171963, 0.3815474, 0.40413848, 0.4073318, 0.4105175, 0.4294877, 0.44513425, 0.44824854, 0.45756486, 0.48224315, 0.4883819, 0.49451026, 0.497571, 0.5219858, 0.5887641])
 
 
 
 
-# Create a class to handle drag events for the curve segment using Normalized Gaussian Weighting
-class DraggableCurveNormalizedGaussian:
-    def __init__(self, ax, x, y, sigma=5):
-        self.ax = ax
-        self.x = x
-        self.y = y
-        self.sigma = sigma  # Standard deviation for Gaussian function
-        self.line, = ax.plot(x, y, c='blue', label='Curve')
-        self.press = None
-        self.background = None
-        self.connect()
+target = np.array(
+[-0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477
+, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477
+, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477
+, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477
+, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477
+, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477
+, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477
+, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477
+, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477
+, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477
+, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477, -0.25125477
+, -0.25125477, -0.25125477, -0.25125477, -0.25125477, 0.3433835, 0.3433835
+, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835
+, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835
+, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835
+, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835
+, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835
+, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835
+, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835
+, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835
+, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835
+, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835
+, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835
+, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835, 0.3433835
+, 0.3433835])
 
-    def connect(self):
-        self.cid_press = self.line.figure.canvas.mpl_connect('button_press_event', self.on_press)
-        self.cid_release = self.line.figure.canvas.mpl_connect('button_release_event', self.on_release)
-        self.cid_motion = self.line.figure.canvas.mpl_connect('motion_notify_event', self.on_motion)
 
-    def closest_point(self, x, y):
-        dist = (self.x - x)**2 + (self.y - y)**2
-        return np.argmin(dist)
-
-    def on_press(self, event):
-        if event.inaxes != self.line.axes: return
-        idx = self.closest_point(event.xdata, event.ydata)
-        self.press = idx, event.xdata, event.ydata
-        self.background = self.line.figure.canvas.copy_from_bbox(self.line.axes.bbox)
-
-    def on_motion(self, event):
-        if self.press is None: return
-        if event.inaxes != self.line.axes: return
-        idx, x_press, y_press = self.press
-        dy = event.ydata - y_press
-        # Compute Gaussian weights and normalize them
-        weights = np.exp(-((np.arange(len(self.y)) - idx) ** 2) / (2 * self.sigma ** 2))
-        weights /= np.sum(weights)
-        # Update the curve segment smoothly based on normalized Gaussian weighting
-        self.y += dy * weights
-        self.line.set_data(self.x, self.y)
-        self.line.figure.canvas.restore_region(self.background)
-        self.line.axes.draw_artist(self.line)
-        self.line.figure.canvas.blit(self.line.axes.bbox)
-
-    def on_release(self, event):
-        self.press = None
-        self.line.figure.canvas.draw()
-
-# Generate some example data
-x = np.linspace(0, 10, 100)
-y = np.sin(x)
-
-# Create a plot and make the curve segment draggable using Normalized Gaussian Weighting
-fig, ax = plt.subplots(figsize=(10, 6))
-draggable = DraggableCurveNormalizedGaussian(ax, x, y, sigma=5)
-plt.xlabel('X')
-plt.ylabel('Y')
-plt.title('Interactive Plot Example (Drag the curve segment with Normalized Gaussian Weighting)')
-plt.legend()
-plt.show()
-
+mse_baseline = mean_squared_error(y_hat_original, target)
+#0.023832805
+print(mse_baseline)
+mse_synthetic = mean_squared_error(y_hat_synthetisch, target)
+#0.021997778
+print(mse_synthetic)
+#-0.001835
+print(mse_synthetic - mse_baseline)

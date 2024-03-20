@@ -19,14 +19,13 @@
 
 #datagrid-table {
     table-layout: auto;
-    /* Add any other styles for #datagrid-table here to keep them organized and in one place */
 }
 
 #datagrid-table thead th {
     position: sticky;
     top: 0;
     background-color: white;
-    z-index: 1;
+    z-index: 101;
 }
 
 #datagrid-table td {
@@ -36,10 +35,10 @@
 
 
 #feature-list {
-    max-height: 150px; /* Adjust this value based on your needs */
-    overflow-y: auto; /* Enables vertical scrolling */
-    margin-bottom: 10px; /* Optional: Adds some space below the list */
-    margin-right: 25px; /* Increase horizontal space */
+    max-height: 150px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    margin-right: 25px;
     width: 50%;
 }
 
@@ -49,14 +48,53 @@
 }
 
 #feature-list .list-group-item {
-    padding: 5px 15px; /* Adjust the padding as needed */
-    margin-bottom: 2px; /* Optional: Adds a small space between items */
+    padding: 5px 15px;
+    margin-bottom: 2px;
 }
 
 .button-container {
     display: flex;
     flex-direction: column;
-    gap: 10px; /* Adjust gap between buttons if needed */
+    gap: 10px;
 }
 
+
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgb(0,0,0);
+    background-color: rgba(0,0,0,0.4);
+}
+
+/* Modal Content */
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 30%;
+    position: relative;
+}
+
+/* The Close Button */
+.close-button {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close-button:hover,
+.close-button:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
 

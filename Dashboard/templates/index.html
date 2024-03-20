@@ -67,6 +67,21 @@
                 <div class="button-container" style="display: flex; flex-direction: column;">
                     <button class="btn btn-info mb-2" onclick="SplineInterpolation(selectedFeatures); return false;">Splines</button>
                     <button class="btn btn-info" onclick="retrainFeature(selectedFeatures); return false;">Retrain Feature</button>
+                    <div id="retrainFeatureModal" class="modal" style="display:none;">
+                        <div class="modal-content">
+                            <span class="close-button" onclick="closeModal()">&times;</span>
+                            <label for="elmScale">ELM Scale:</label>
+                            <input type="number" id="elmScale" name="elmScale" value="1"><br>
+
+                            <label for="elmAlpha">ELM Alpha:</label>
+                            <input type="number" id="elmAlpha" name="elmAlpha" value="1"><br>
+
+                            <label for="nrSyntheticDataPoints">Nr. Synthetic Data Points:</label>
+                            <input type="number" id="nrSyntheticDataPoints" name="nrSyntheticDataPoints" value="0"><br>
+
+                            <button onclick="sendRetrainRequest();">Retrain</button>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
@@ -81,6 +96,7 @@
             <button class="btn btn-primary mr-2" onclick="setLinear(); return false;">Set Linear</button>
             <button class="btn btn-primary mr-2" onclick="setMonotonicIncrease(); return false;">Monotonic Increase</button>
             <button class="btn btn-primary mr-2" onclick="setMonotonicDecrease(); return false;">Monotonic Decrease</button>
+            <button class="btn btn-primary mr-2" onclick="setSmooth(); return false;">Smooth</button>
         </form>
         <p style="margin-bottom: 10px;"><b>Incorporate into model:</b></p>
         <form class="form-inline">
@@ -90,7 +106,6 @@
             <button class="btn btn-secondary mr-2" onclick="undoLastChange(); return false;">Undo</button>
         </form>
         <p style="margin-bottom: 10px;"><br><b>Validation data:</b></p>
-        <button id="order-nearest">Order by Nearest Neighbour</button>
         <div id="datagrid-table"></div>
     </div>
     <script src="../static/js/script.js"></script>

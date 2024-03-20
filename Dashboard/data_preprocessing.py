@@ -5,6 +5,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.datasets import load_iris
 from sklearn.preprocessing import StandardScaler
 from sklearn.datasets import fetch_openml
+from sklearn.datasets import fetch_california_housing
+from ucimlrepo import fetch_ucirepo
+
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -24,6 +27,47 @@ def load_and_preprocess_data(dataset='diabetes'):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         return X_train, X_test, y_train, y_test, task
 
+    if dataset == 'mpg':
+        auto_mpg = fetch_ucirepo(id=9)
+
+        # data (as pandas dataframes)
+        X = auto_mpg.data.features
+        y = auto_mpg.data.targets
+        X = X.dropna()
+        y = y.loc[X.index]
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+        X = pd.DataFrame(X_scaled, columns=X.columns)
+        y = (y - y.mean()) / y.std()
+        task = 'regression'
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        return X_train, X_test, y_train, y_test, task
+
+
+    if dataset == 'cal_housing':
+        X, y = fetch_california_housing(return_X_y=True, as_frame=True)
+        print(X.columns)
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+        X_scaled = pd.DataFrame(X_scaled, columns=X.columns)
+
+        #categorical_features = ["Ocean_proximity"]
+        #X_categorical = X.loc[:, categorical_features].astype('object')
+
+
+        #X = pd.concat([X_scaled, X_categorical], axis=1)
+
+
+        # Normalize the target variable
+        y = (y - y.mean()) / y.std()
+
+        # Task type
+        task = 'regression'
+
+        # Split the dataset into training and testing sets
+        X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+
+        return X_train, X_test, y_train, y_test, task
 
     if dataset == 'bike':
         bike_sharing_dataset = fetch_ucirepo(id=275)
