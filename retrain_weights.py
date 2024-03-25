@@ -6,6 +6,7 @@ from sklearn.metrics import mean_squared_error, f1_score
 from Dashboard.data_preprocessing import load_and_preprocess_data
 from Dashboard.model_adapter import ModelAdapter
 import torch
+import seaborn as sns
 
 if __name__ == "__main__":
     print("Running main script")
@@ -14,9 +15,9 @@ if __name__ == "__main__":
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("adult")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("iris")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
-    X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
+    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("cal_housing")
-    #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("bike")
+    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("bike")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("mpg")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
     adapter = ModelAdapter(task, elm_alpha=0.001)
@@ -48,10 +49,10 @@ if __name__ == "__main__":
 
     #features_to_change = ['sepal width (cm)']
     #features_to_change = ['temp']
-    features_to_change = ['bmi', 'bp', "age", "s1", "s2", "s3", "s4", "s5", "s6"]
+    #features_to_change = ['bmi', 'bp', "age", "s1", "s2", "s3", "s4", "s5", "s6"]
     #features_to_change =['MedInc', 'HouseAge', 'AveRooms', 'AveBedrms', 'Population', 'AveOccup', 'Latitude', 'Longitude']
     #features_to_change = ["cylinders", "horsepower", "weight", "acceleration", "model_year", "displacement", "origin"]
-    #features_to_change = ['temp', 'atemp', 'hum', 'windspeed']
+    features_to_change = ['temp', 'atemp', 'hum', 'windspeed']
 
     #features_to_change = ['Age', 'Members', 'Sex']
     #features_to_change = ['education-num', 'workclass', 'marital-status', 'capital-loss']
@@ -59,7 +60,12 @@ if __name__ == "__main__":
     shape_functions_dict = adapter.model.get_shape_functions_as_dict()
     #adapter.plot_single(plot_by_list=['age', 'bmi', 'bp', 'sex', 's1', 's2'])
     #adapter.plot_single(plot_by_list=features_to_change)
-    adapter.model.plot_single(show_n=15)
+    adapter.model.plot_single(show_n=15, max_cat_plotted=15)
+    correlation_matrix = X_train.corr()
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap='coolwarm')
+    plt.show()
+
     #adapter.model.plot_single(plot_by_list=['hr', 'mnth', 'weekday'], max_cat_plotted=12)
     print(adapter.model)
     # this part is already given in the flask application

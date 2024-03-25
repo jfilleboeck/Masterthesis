@@ -65,26 +65,27 @@
                 });
             </script>
                 <div class="button-container" style="display: flex; flex-direction: column;">
-                    <button class="btn btn-info mb-2" onclick="SplineInterpolation(selectedFeatures); return false;">Splines</button>
-                    <button class="btn btn-info" onclick="retrainFeature(selectedFeatures); return false;">Retrain Feature</button>
-                    <div id="retrainFeatureModal" class="modal" style="display:none;">
-                        <div class="modal-content">
-                            <span class="close-button" onclick="closeModal()">&times;</span>
-                            <label for="elmScale">ELM Scale:</label>
-                            <input type="number" id="elmScale" name="elmScale" value="1"><br>
-
-                            <label for="elmAlpha">ELM Alpha:</label>
-                            <input type="number" id="elmAlpha" name="elmAlpha" value="1"><br>
-
-                            <label for="nrSyntheticDataPoints">Nr. Synthetic Data Points:</label>
-                            <input type="number" id="nrSyntheticDataPoints" name="nrSyntheticDataPoints" value="0"><br>
-
-                            <button onclick="sendRetrainRequest();">Retrain</button>
-                        </div>
-                    </div>
+                    <button class="btn btn-info mb-2" onclick="SplineInterpolation(selectedFeatures); return false;">Spline Interpol.</button>
+                    <button class="btn btn-info" onclick="sendRetrainRequest(); return false;">Retrain Weights</button>
+                </div>
+                <p style="margin-bottom: 10px;"><b>Hyperparameters for Retrain Weight Method</b></p>
+                <div class="container_parameter" style="margin-bottom: 5px;">
+                  <div class="field">
+                    <label for="hidden_elmAlpha">Elm Alpha</label>
+                    <input type="number" id="hidden_elmAlpha" value="1">
+                  </div>
+                  <div class="field">
+                    <label for="hidden_elmScale">ELM Scale</label>
+                    <input type="number" id="hidden_elmScale" value="0.5">
+                  </div>
+                  <div class="field">
+                    <label for="hidden_nrSyntheticDataPoints">Nr. Synth. Data</label>
+                    <input type="number" id="hidden_nrSyntheticDataPoints" value="0">
+                  </div>
                 </div>
             </form>
         </div>
+
 
     <div class="control-panel mt-4">
         <p><b>Adjust the shape function:</b></p>

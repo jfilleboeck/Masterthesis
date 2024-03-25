@@ -9,6 +9,7 @@ import torch
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.metrics import mean_squared_error, f1_score
+from sklearn.preprocessing import LabelEncoder
 
 from data_preprocessing import load_and_preprocess_data
 from model_adapter import ModelAdapter
@@ -23,6 +24,9 @@ model.fit(X_train, y_train)
 
 # Setup
 app = Flask(__name__)
+
+
+
 
 
 def load_data():
@@ -62,6 +66,7 @@ def index():
          feature['hist'].hist.tolist(), feature['hist'].bin_edges.tolist())
         for feature in shape_functions_dict
     )
+
 
     return render_template('index.html', feature_names=X_names, x_data=x_data,
                            y_data=y_data, displayed_feature=feature_name, is_numeric_feature=is_numeric_feature,
@@ -338,13 +343,13 @@ def retrain_feature():
     data = request.json
     selectedFeatures = data['selectedFeatures']
     displayed_feature = data['displayed_feature']
-    elmScale = data['elmScale']
-    elmAlpha = data['elmAlpha']
-    nrSyntheticDataPoints = data['nrSyntheticDataPoints']
+    elmScale = float(data['elmScale'])
+    elmAlpha = float(data['elmAlpha'])
+    nrSyntheticDataPoints = int(data['nrSyntheticDataPoints'])
 
 
     print(selectedFeatures)
-
+    print("check1")
     updated_data = {}
     for feature in shape_functions_dict:
         name = feature['name']
@@ -358,12 +363,11 @@ def retrain_feature():
             updated_data[name] = {'x': x_values, 'y': y_values.tolist(), 'datatype': 'numerical'}
         else:
             updated_data[name] = {'x': x_values, 'y': y_values, 'datatype': 'categorical'}
-    # x_data = feature_data_dict['x'].tolist()
-    # y_data = feature_current_state[displayed_feature].tolist()
+
+    print("check2")
+
     model.adapt(selectedFeatures, updated_data, "feature_retraining", (elmScale, elmAlpha, nrSyntheticDataPoints))
-    # shape_functions_dict = model.model.get_shape_functions_as_dict()
-    # load_data()
-    # replace_model(adapter)
+
     displayed_feature_data = next(
         (item for item in model.get_shape_functions_as_dict() if item['name'] == displayed_feature), None)
 
@@ -373,8 +377,12 @@ def retrain_feature():
     y_data_to_return = y_data.tolist() if not isinstance(y_data, list) else y_data
     x_data_to_return = [float(x) for x in x_data_to_return]
     y_data_to_return = [float(y) for y in y_data_to_return]
+    print("check3")
+    print(x_data_to_return)
+    print(y_data_to_return)
 
-
+    #print(jsonify({'x': x_data_to_return, 'y': y_data_to_return}))
+    #return None
     return jsonify({'x': x_data_to_return, 'y': y_data_to_return})
 
 

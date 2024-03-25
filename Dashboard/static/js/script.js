@@ -288,16 +288,30 @@ function SplineInterpolation(selectedFeatures) {
 }
 
 
-function retrainFeature(selectedFeatures) {
+function retrainFeature() {
+    console.log(document.getElementById('hidden_elmScale').value);
     document.getElementById('retrainFeatureModal').style.display = 'block';
 }
 
 // New function to send retrain request
 function sendRetrainRequest() {
+
     const displayed_feature = document.getElementById('display-feature').value;
-    const elmScale = document.getElementById('elmScale').value;
-    const elmAlpha = document.getElementById('elmAlpha').value;
-    const nrSyntheticDataPoints = document.getElementById('nrSyntheticDataPoints').value;
+    const elmScaleElement = document.getElementById('hidden_elmScale');
+    const elmScale = parseFloat(elmScaleElement.value);
+    const elmAlphaElement = document.getElementById('hidden_elmAlpha')
+    const elmAlpha = parseFloat(elmAlphaElement.value);
+    const nrSyntheticDataPointsElement = document.getElementById('hidden_nrSyntheticDataPoints')
+    const nrSyntheticDataPoints = parseInt(nrSyntheticDataPointsElement.value);
+
+    console.log(JSON.stringify({
+        displayed_feature: displayed_feature,
+        selectedFeatures: selectedFeatures,
+        elmScale: elmScale,
+        elmAlpha: elmAlpha,
+        nrSyntheticDataPoints: nrSyntheticDataPoints
+    }));
+
 
     fetch('/retrain_feature', {
         method: 'POST',
@@ -312,24 +326,31 @@ function sendRetrainRequest() {
             nrSyntheticDataPoints: nrSyntheticDataPoints
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response received');
+        return response.json();
+    })
     .then(data => {
+        console.log('Data processed', data);
         if (data.error) {
             alert('Error occurred: ' + data.error);
         } else {
+
             Plotly.update('plot', {
                 y: [data.y]
             });
+
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while processing your request.');
+        alert(error.message);
     }).then(() => {
         predictAndGetMetrics();
         document.getElementById('retrainFeatureModal').style.display = 'none'; // Hide the popup after the request
     });
 }
+
 
 function closeModal() {
     document.getElementById('retrainFeatureModal').style.display = 'none';
@@ -512,5 +533,4 @@ function orderByNearest() {
     .catch(error => console.error('Error:', error));
 }
 
-document.getElementById('order-nearest').addEventListener('click', orderByNearest);
 

@@ -98,3 +98,22 @@
     cursor: pointer;
 }
 
+
+
+  .container_parameter {
+    display: flex;
+    justify-content: start;
+    gap: 10px; /* Adjust the space between each input field */
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  input[type="number"] {
+    width: 45px; /* Makes the input fields smaller */
+    height: 20px; /* Adjust height as needed */
+  }
+  label {
+    margin-bottom: 5px;
+  }

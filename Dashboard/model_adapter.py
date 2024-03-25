@@ -186,23 +186,13 @@ class IGANNAdapter(IGANN):
 
     def feature_retraining(self, features_to_change, updated_data, hyperparamethers=None):
         self.features_adapted = True
-        print(f"Hyperparameter: {hyperparamethers}")
         if hyperparamethers is not None:
             # Try to cast hyperparameters to int, if fail then cast to float.
-            try:
-                elm_scale = int(hyperparamethers[0])
-            except ValueError:
-                elm_scale = float(hyperparamethers[0])
-
-            try:
-                elm_alpha = int(hyperparamethers[1])
-            except ValueError:
-                elm_alpha = float(hyperparamethers[1])
-            print(elm_scale)
-            print(type(elm_scale))
-            print(elm_alpha)
-            print(type(elm_alpha))
-            nr_synthetic_data_points = int(hyperparamethers[2])
+            elm_scale = hyperparamethers[0]
+            print('elm_scale')
+            print('elm_alpha')
+            elm_alpha = hyperparamethers[1]
+            nr_synthetic_data_points = hyperparamethers[2]
             if nr_synthetic_data_points > 0:
                 updated_data = self.create_synthetic_data(nr_synthetic_data_points, features_to_change, updated_data)
         else:

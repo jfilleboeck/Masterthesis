@@ -96,7 +96,7 @@ def load_and_preprocess_data(dataset='diabetes'):
 
         X = pd.concat([X_scaled, X_categorical], axis=1)
         #X = X.astype('object')
-
+        #X = X[['mnth', 'season']]
         #X = X[['hr', 'mnth', 'weekday']].astype('object')
 
 
