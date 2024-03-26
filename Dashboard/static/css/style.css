@@ -112,8 +112,8 @@
   }
   input[type="number"] {
     width: 45px; /* Makes the input fields smaller */
-    height: 20px; /* Adjust height as needed */
+    height: 25px; /* Adjust height as needed */
   }
   label {
-    margin-bottom: 5px;
+    margin-bottom: 1px;
   }

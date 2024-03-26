@@ -59,17 +59,17 @@ function createHistogramPlot(hist_data, bin_edges) {
 // Event listener and feature selection
 
 
-document.addEventListener('DOMContentLoaded', function() {
-    const selectBox = document.getElementById('display-feature');
-    // Event listener for feature selection change
-    selectBox.addEventListener('change', function () {
-        displayedFeature = selectBox.value;
-        fetchFeatureData(displayedFeature);
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectBox = document.getElementById('display-feature');
+        // Event listener for feature selection change
+        selectBox.addEventListener('change', function () {
+            displayedFeature = selectBox.value;
+            fetchFeatureData(displayedFeature);
+        });
+        predictAndGetMetrics();
+        //fetchFeatureData(selectBox.value);
+        fetchDataAndCreateTable();
     });
-    predictAndGetMetrics();
-    //fetchFeatureData(selectBox.value);
-    fetchDataAndCreateTable();
-});
 
 function fetchFeatureData(displayedFeature) {
     fetch('/feature_data', {
@@ -288,10 +288,6 @@ function SplineInterpolation(selectedFeatures) {
 }
 
 
-function retrainFeature() {
-    console.log(document.getElementById('hidden_elmScale').value);
-    document.getElementById('retrainFeatureModal').style.display = 'block';
-}
 
 // New function to send retrain request
 function sendRetrainRequest() {
@@ -352,9 +348,6 @@ function sendRetrainRequest() {
 }
 
 
-function closeModal() {
-    document.getElementById('retrainFeatureModal').style.display = 'none';
-}
 
 function predictAndGetMetrics() {
     fetch('/predict_and_get_metrics')
@@ -436,8 +429,7 @@ function generateColumns(data) {
     return columns;
 }
 
-// Function to create the table
-// Variable to store the selected row ID
+
 let selectedRowId = null;
 
 function createTable(data) {
