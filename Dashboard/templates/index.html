@@ -106,8 +106,23 @@
             <button class="btn btn-danger" style="margin-right: 8px" onclick="resetGraph(); return false;">Reset</button>
             <button class="btn btn-secondary mr-2" onclick="undoLastChange(); return false;">Undo</button>
         </form>
-        <p style="margin-bottom: 10px;"><br><b>Validation data:</b></p>
-        <div id="datagrid-table"></div>
+<div class="flex-buttons" style="margin-top: 15px; margin-bottom: 10px" >
+    <button id="validation-data-button">Validation Data</button>
+    <button id="instance-explanations-button">Instance Explanations</button>
+    <button id="shape-functions-button">Display all shape functions</button>
+    <button id="correlation-matrix-button">Display correlation matrix</button>
+    </div>
+
+    <div id="datagrid-table" class="content-section"></div>
+    <div id="instance-explanations-content" class="content-section">
+        <p>Instance explanations content goes here.</p>
+    </div>
+    <div id="shape-functions-content" class="content-section">
+        <p>All shape functions content goes here.</p>
+    </div>
+    <div id="correlation-matrix-content" class="content-section">
+        <p>Correlation matrix content goes here.</p>
+    </div>
     </div>
     <script src="../static/js/script.js"></script>
 </body>

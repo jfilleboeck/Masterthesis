@@ -60,6 +60,7 @@ function createHistogramPlot(hist_data, bin_edges) {
 
 
     document.addEventListener('DOMContentLoaded', function() {
+
         const selectBox = document.getElementById('display-feature');
         // Event listener for feature selection change
         selectBox.addEventListener('change', function () {
@@ -68,9 +69,34 @@ function createHistogramPlot(hist_data, bin_edges) {
         });
         predictAndGetMetrics();
         //fetchFeatureData(selectBox.value);
-        fetchDataAndCreateTable();
+    fetchDataAndCreateTable();
+
+    const validationDataButton = document.getElementById('validation-data-button');
+    const instanceExplanationsButton = document.getElementById('instance-explanations-button');
+    const shapeFunctionsButton = document.getElementById('shape-functions-button');
+    const correlationMatrixButton = document.getElementById('correlation-matrix-button');
+
+    validationDataButton.addEventListener('click', function() {
+        hideAllContentSections();
+        document.getElementById('datagrid-table').style.display = 'block';
     });
 
+    instanceExplanationsButton.addEventListener('click', function() {
+        hideAllContentSections();
+        document.getElementById('instance-explanations-content').style.display = 'block';
+    });
+
+    shapeFunctionsButton.addEventListener('click', function() {
+        hideAllContentSections();
+        document.getElementById('shape-functions-content').style.display = 'block';
+    });
+
+    correlationMatrixButton.addEventListener('click', function() {
+        hideAllContentSections();
+        document.getElementById('correlation-matrix-content').style.display = 'block';
+    });
+
+    });
 function fetchFeatureData(displayedFeature) {
     fetch('/feature_data', {
         method: 'POST',
@@ -490,6 +516,7 @@ function createTable(data) {
 
 
 function fetchDataAndCreateTable() {
+    console.log("Method called");
     fetch('/load_data_grid_instances', {
         method: 'POST',
         headers: {
@@ -505,6 +532,14 @@ function fetchDataAndCreateTable() {
     })
     .then(data => createTable(data))
     .catch(error => console.error('Error:', error));
+}
+
+
+function hideAllContentSections() {
+    const sections = document.querySelectorAll('.content-section');
+    sections.forEach(section => {
+        section.style.display = 'none';
+    });
 }
 
 function orderByNearest() {
