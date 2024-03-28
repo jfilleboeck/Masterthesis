@@ -12,7 +12,7 @@ const layout = {
     responsive: true,
 };
 let displayedFeature = document.getElementById('display-feature').value;
-
+var valData = null;
 // Variables for counterfactual axis description
 const specificValue = 0.953; // Value from Table
 const hoverTextArray = plotData[0].y.map(y => `=${(y - specificValue).toFixed(3)}<extra></extra>`);
@@ -84,6 +84,7 @@ function createHistogramPlot(hist_data, bin_edges) {
     instanceExplanationsButton.addEventListener('click', function() {
         hideAllContentSections();
         document.getElementById('instance-explanations-content').style.display = 'block';
+        fetchAndDisplayInstanceExplanation();
     });
 
     shapeFunctionsButton.addEventListener('click', function() {
@@ -445,24 +446,45 @@ function store_x_values() {
 };
 
 // Function to generate columns based on JSON keys
-function generateColumns(data) {
+function generateColumns(data, backendColumns) {
     var columns = [];
-    if(data.length > 0){
-        for (var key in data[0]) {
-            columns.push({title: key.charAt(0).toUpperCase() + key.slice(1), field: key});
-        }
+    var backendColumnSet = new Set(backendColumns);
+    backendColumns.forEach(columnName => {
+        if (columnName === 'ID') return; // Skip 'ID' here as it's added conditionally below
+        columns.push({
+            title: columnName.charAt(0).toUpperCase() + columnName.slice(1),
+            field: columnName,
+        });
+    });
+
+    // Ensure 'ID' column is added first if it exists in backendColumns or in the first row of data
+    if (backendColumnSet.has('ID') || data[0]?.hasOwnProperty('ID')) {
+        columns.unshift({ title: 'ID', field: 'ID' });
     }
+
+    if (data.length > 0) {
+        Object.keys(data[0]).forEach(key => {
+            if (!backendColumnSet.has(key)) {
+                columns.push({
+                    title: key.charAt(0).toUpperCase() + key.slice(1),
+                    field: key,
+                });
+            }
+        });
+    }
+
     return columns;
 }
 
 
-let selectedRowId = null;
 
-function createTable(data) {
+let selectedRowId_1 = null;
+let selectedRowId_2 = null;
+function createTable(data, backendColumns) {
     var table = new Tabulator("#datagrid-table", {
         data: data,
         layout: "fitColumns",
-        columns: generateColumns(data),
+        columns: generateColumns(data, backendColumns),
         // Define the context menu for each row
         rowContextMenu: [
             {
@@ -495,23 +517,22 @@ function createTable(data) {
                 label:"Add to plot 1",
                 action: function(e, row){
                     e.preventDefault();
-                    selectedRowId = row.getData().ID;
+                    selectedRowId_1 = row.getData().ID;
                     // Code to add to plot 1 here
-                    console.log("Adding to plot 1, ID:", selectedRowId);
+                    console.log("Adding to plot 1, ID:", selectedRowId_1);
                 }
             },
             {
                 label:"Add to plot 2",
                 action: function(e, row){
                     e.preventDefault();
-                    selectedRowId = row.getData().ID;
+                    selectedRowId_2 = row.getData().ID;
                     // Code to add to plot 2 here
-                    console.log("Adding to plot 2, ID:", selectedRowId);
+                    console.log("Adding to plot 2, ID:", selectedRowId_2);
                 }
             },
         ],
     });
-    console.log(data);
 }
 
 
@@ -530,8 +551,44 @@ function fetchDataAndCreateTable() {
         }
         return response.json();
     })
-    .then(data => createTable(data))
+    .then(response => {
+        console.log(response);
+        const { data, columns } = response; // Destructure the data and columns from the response
+        createTable(data, columns); // Pass both data and columns to createTable
+    })
     .catch(error => console.error('Error:', error));
+}
+
+
+function fetchAndDisplayInstanceExplanation() {
+    console.log("Fetching Instance Explanation");
+
+    // Assuming `data` is a global variable that holds the data you want to send
+    // Replace '/path/to/instance_explanation' with the actual backend endpoint you are targeting
+    fetch('/instance_explanation', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({selectedRowId_1: selectedRowId_1,
+            selectedRowId_2: selectedRowId_2})
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(explanationData => {
+            // Assuming you want to display the result in 'instance-explanations-content' div
+            const explanationsContainer = document.getElementById('instance-explanations-content');
+
+            // Clear existing content
+            explanationsContainer.innerHTML = '';
+
+            // Insert new content. Modify this according to how your data is structured and how you want it displayed
+            explanationsContainer.innerHTML = `<p>${explanationData.explanation}</p>`; // Example of displaying the explanation
+        })
 }
 
 

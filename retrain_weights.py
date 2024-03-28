@@ -17,7 +17,7 @@ if __name__ == "__main__":
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("cal_housing")
-    X_train, X_test, y_train, y_test, task = load_and_preprocess_data("bike")
+    X_train, X_test, y_train, y_test, task = load_and_preprocess_data()
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("mpg")
     #X_train, X_test, y_train, y_test, task = load_and_preprocess_data("titanic")
     adapter = ModelAdapter(task, elm_alpha=0.001)
@@ -27,6 +27,8 @@ if __name__ == "__main__":
 
     # Calculate and print mean squared error
     y_train_pred = adapter.predict(X_train)
+    print(type(y_train_pred))
+    print(y_train_pred)
     y_test_pred = adapter.predict(X_test)
 
     if task == "regression":
@@ -49,10 +51,11 @@ if __name__ == "__main__":
 
     #features_to_change = ['sepal width (cm)']
     #features_to_change = ['temp']
+    features_to_change = ['bmi', 'bp']
     #features_to_change = ['bmi', 'bp', "age", "s1", "s2", "s3", "s4", "s5", "s6"]
     #features_to_change =['MedInc', 'HouseAge', 'AveRooms', 'AveBedrms', 'Population', 'AveOccup', 'Latitude', 'Longitude']
     #features_to_change = ["cylinders", "horsepower", "weight", "acceleration", "model_year", "displacement", "origin"]
-    features_to_change = ['temp', 'atemp', 'hum', 'windspeed']
+    #features_to_change = ['temp', 'atemp', 'hum', 'windspeed']
 
     #features_to_change = ['Age', 'Members', 'Sex']
     #features_to_change = ['education-num', 'workclass', 'marital-status', 'capital-loss']
@@ -61,10 +64,10 @@ if __name__ == "__main__":
     #adapter.plot_single(plot_by_list=['age', 'bmi', 'bp', 'sex', 's1', 's2'])
     #adapter.plot_single(plot_by_list=features_to_change)
     adapter.model.plot_single(show_n=15, max_cat_plotted=15)
-    correlation_matrix = X_train.corr()
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap='coolwarm')
-    plt.show()
+    #correlation_matrix = X_train.corr()
+    #plt.figure(figsize=(10, 8))
+    #sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap='coolwarm')
+    #plt.show()
 
     #adapter.model.plot_single(plot_by_list=['hr', 'mnth', 'weekday'], max_cat_plotted=12)
     print(adapter.model)
@@ -112,22 +115,19 @@ if __name__ == "__main__":
             updated_data[name] = {'x': x_values, 'y': y_values, 'datatype': 'categorical'}
 
 
-    # ändern, wenn es in Wesite Code kommt: Nur die Änderungen von features_to_change in feature_current_state übernehmen
-    # updated_data == feature-current_state; anpassen für kategorische Werte
-    # Als erstes möchte ich eine Liste von features to change übergeben
 
-    adapter = adapter.adapt(features_to_change, updated_data, "feature_retraining", hyperparamethers=[0, 100, 1])
-
-    y_train_pred = adapter.predict(X_train)
-    y_test_pred = adapter.predict(X_test)
-    if task == "regression":
-        mse_train = mean_squared_error(y_train, y_train_pred)
-        mse_test = mean_squared_error(y_test, y_test_pred)
-        print(f"MSE Train: {mse_train}, MSE Test: {mse_test}")
-    else:
-        f1_train = f1_score(y_train, y_train_pred, average='weighted')
-        f1_test = f1_score(y_test, y_test_pred, average='weighted')
-        print(f"Train F1 Score: {f1_train}, Test F1 Score: {f1_test}")
+    # adapter = adapter.adapt(features_to_change, updated_data, "feature_retraining", hyperparamethers=[1, 1, 1])
+    #
+    # y_train_pred = adapter.predict(X_train)
+    # y_test_pred = adapter.predict(X_test)
+    # if task == "regression":
+    #     mse_train = mean_squared_error(y_train, y_train_pred)
+    #     mse_test = mean_squared_error(y_test, y_test_pred)
+    #     print(f"MSE Train: {mse_train}, MSE Test: {mse_test}")
+    # else:
+    #     f1_train = f1_score(y_train, y_train_pred, average='weighted')
+    #     f1_test = f1_score(y_test, y_test_pred, average='weighted')
+    #     print(f"Train F1 Score: {f1_train}, Test F1 Score: {f1_test}")
 
     adapter.plot_single(plot_by_list=features_to_change)
     x = torch.tensor([-2.0177, -2.0005, -1.9949, -1.9894, -1.9832, -1.9777, -1.9086, -1.8396,
@@ -141,20 +141,20 @@ if __name__ == "__main__":
      1.5438, 1.6819, 1.7509, 1.7854, 1.8200, 1.8890, 1.9580, 2.0271,
      2.0961, 2.1652, 2.2342, 2.3033, 2.3723, 2.4414, 2.5104, 2.7866,
      2.8557, 3.0628, 3.4771])
-    i = 0
+    i = 9
     #[-2, -1.7, -1.3, -1, 0 , 1, 2]
     #print("Intercept: ")
     #print(adapter.init_classifier.intercept_)
     # pred = adapter.init_classifier.coef_[0, i] * np.array(x)
     #print("Prediction Init Classifier: ")
     #print(pred)
-    # print(adapter.feature_names)
+    #print(adapter.feature_names)
 
     #pred_new = np.array([0, 0, 0, 0, 0])
     pred_new = torch.tensor([0, 0, 0], dtype=torch.float)
 
     #pred_new = pred.tolist()
-    for regressor, boost_rate in zip(adapter.regressors, adapter.boosting_rates):
+    for regressor, boost_rate in zip(adapter.model.regressors, adapter.model.boosting_rates):
         pred_new += (
             boost_rate
             * regressor.predict_single((torch.tensor([-1, 0.01, 1], dtype=torch.float)).reshape(-1, 1), i).squeeze()

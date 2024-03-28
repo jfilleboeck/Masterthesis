@@ -18,20 +18,20 @@ from model_adapter import ModelAdapter
 X_train, X_val, y_train, y_val, task = load_and_preprocess_data()
 
 
-model = ModelAdapter(task)
+adapter = ModelAdapter(task)
 
-model.fit(X_train, y_train)
+adapter.fit(X_train, y_train)
 
 # Setup
 app = Flask(__name__)
 
 
 
-
+rows = None
 
 def load_data():
     global shape_functions_dict, feature_history, feature_current_state
-    shape_functions_dict = model.get_shape_functions_as_dict()
+    shape_functions_dict = adapter.get_shape_functions_as_dict()
     feature_history = {}
     feature_current_state = {}
 
@@ -366,10 +366,10 @@ def retrain_feature():
 
     print("check2")
 
-    model.adapt(selectedFeatures, updated_data, "feature_retraining", (elmScale, elmAlpha, nrSyntheticDataPoints))
+    adapter.adapt(selectedFeatures, updated_data, "feature_retraining", (elmScale, elmAlpha, nrSyntheticDataPoints))
 
     displayed_feature_data = next(
-        (item for item in model.get_shape_functions_as_dict() if item['name'] == displayed_feature), None)
+        (item for item in adapter.get_shape_functions_as_dict() if item['name'] == displayed_feature), None)
 
     x_data = displayed_feature_data['x']
     y_data = displayed_feature_data['y']
@@ -392,8 +392,8 @@ def retrain_feature():
 def predict_and_get_metrics():
     # Example model predictions and task definition
     # These should be replaced with your actual model predictions and task determination logic
-    y_train_pred = model.predict(X_train)
-    y_val_pred = model.predict(X_val)
+    y_train_pred = adapter.predict(X_train)
+    y_val_pred = adapter.predict(X_val)
 
     if task == "regression":
         train_score = mean_squared_error(y_train, y_train_pred)
@@ -415,10 +415,10 @@ def get_original_data():
     displayed_feature = data['displayed_feature']
 
     # Obtain the original data for the selected feature
-    model = ModelAdapter(task)
-    model.fit(X_train, y_train)
+    adapter = ModelAdapter(task)
+    adapter.fit(X_train, y_train)
     load_data()
-    original_data = next(item for item in model.get_shape_functions_as_dict() if item['name'] == displayed_feature)
+    original_data = next(item for item in adapter.get_shape_functions_as_dict() if item['name'] == displayed_feature)
     original_y = original_data['y']
 
     # Reset the current state and history for the selected feature
@@ -453,69 +453,138 @@ def undo_last_change():
 
 @app.route('/load_data_grid_instances', methods=['POST'])
 def load_data_grid_instances():
-    X_val_preprocessed = model.model._preprocess_feature_matrix(X_val, fit_dummies=True)
-    X_val_preprocessed_df = pd.DataFrame(X_val_preprocessed.numpy())
+    # Assume X_val, y_val, and adapter are defined and valid
+    X_val_preprocessed = adapter.model._preprocess_feature_matrix(X_val, fit_dummies=True)
+    X_val_preprocessed_df = pd.DataFrame(X_val_preprocessed.numpy(), columns=adapter.feature_names)  # Apply column names directly
 
     # Round numerical values to three decimal places
     X_val_preprocessed_df = X_val_preprocessed_df.round(3)
 
     y_val_reset = y_val.reset_index(drop=True)
-
+    prediction = adapter.predict(X_val_preprocessed_df)
     # Concatenate along the columns to get a single DataFrame
     combined_data = pd.concat([X_val_preprocessed_df, y_val_reset], axis=1)
+    combined_data.insert(len(combined_data.columns), 'prediction', prediction)
 
-    # Ensure that the target variable (or any other numerical columns in y_val_reset) is rounded as well
+    # Ensure that the target variable (or any other numerical columns) is rounded as well
     combined_data = combined_data.round(3)
 
-    combined_data.insert(0, 'ID', combined_data.index)
+    combined_data.insert(0, 'ID', range(1, 1 + len(combined_data)))
 
-    # Convert DataFrame to dictionary with rounded numerical values
+    # Convert DataFrame to dictionary
     rows = combined_data.to_dict(orient='records')
     for row in rows:
         for key, value in row.items():
             if isinstance(value, float):
                 row[key] = round(value, 3)  # Ensure rounding persists in the dictionary
 
-    for i, feature_name in enumerate(model.feature_names):
-        for row in rows:
-            if i in row:
-                row[feature_name] = row.pop(i)
 
-    return jsonify(rows)
+    response = {
+        'data': rows,
+        'columns': ['ID'] + adapter.feature_names + ['prediction', 'target']  # Assuming 'target' is the name in y_val_reset
+    }
+    return jsonify(response)
 
 @app.route('/instance_explanation', methods=['POST'])
 def instance_explanation():
-    data = request.json['data']
-    selectedRowId = request.json['selectedRowId']
+    selectedRowId_1 = request.json['selectedRowId_1']
+    selectedRowId_2 = request.json['selectedRowId_2']
+    explanation = f"Generated explanation based on input data: {selectedRowId_1}"
+
+    # Generate predictions
+
+    # Auswahl Buttons
+    # Automatisches Setzen der Auswahl Buttons
+    # Diagramme
+
+    # Return the explanation as JSON
+
+    intercept = adapter.model.init_classifier.intercept_
+    # Now, retrieve the rows for your selected IDs
+    row_data_1 = get_row_by_id(selectedRowId_1)
+    print(row_data_1)
+    row_data_2 = get_row_by_id(selectedRowId_2)
+    #selectedRowId = request.json['selectedRowId']
     # mit Auswahl Button die prediction für diese Zeile durchführen (wenn ausgewählt, dann wird auch predicted)
     # per Rechtsklick kann man den Auswahl Button triggern
-    # {
-    #     "ID": 0,
-    #     "age": 0.953,
-    #     "bmi": -0.13,
-    #     "bp": -0.336,
-    #     "s1": 2.628,
-    #     "s2": 2.632,
-    #     "s3": 0.403,
-    #     "s4": 0.721,
-    #     "s5": 0.682,
-    #     "s6": -0.11,
-    #     "sex_w": 0,
-    #     "target": 0.867
-    # }
-    intercept = model.model.init_classifier.intercept_
+
+    intercept = adapter.model.init_classifier.intercept_
+    print(intercept)
+
+    global rows
+    # and key!= prediction
+    feature_names = [key for key in rows[0].keys() if key != 'ID' and key != 'target'] if rows else []
+
+    # Initialize lists to hold the feature values
+    values_1 = [0] * len(feature_names)
+    values_2 = [0] * len(feature_names)
+
+    # Directly process row_data_1 and row_data_2
+    if row_data_1 is not None:
+        values_1 = [row_data_1.get(feature, 0) for feature in feature_names if feature and feature != "target"]
+
+    if row_data_2 is not None:
+        values_2 = [row_data_2.get(feature, 0) for feature in feature_names if feature and feature != "target"]
+    pred_1 = []
+    pred_2 = []
+    print(feature_names)
+    print()
+    print()
+    print()
+    print(values_1)
+    for position, name in enumerate(feature_names):
+        print(name, position)
+        i = feature_names.index(name)
+        x_1 = values_1[position]
+        pred = torch.tensor([0], dtype=torch.float)
+        for regressor, boost_rate in zip(adapter.model.regressors, adapter.model.boosting_rates):
+            pred += (
+                    boost_rate
+                    * regressor.predict_single((torch.tensor([x_1], dtype=torch.float)).reshape(-1, 1),
+                                               i).squeeze()
+            ).cpu()
+
+        pred_1.append(pred)
+        x_2 = values_2[position]
+        pred = torch.tensor([0], dtype=torch.float)
+        for regressor, boost_rate in zip(adapter.model.regressors, adapter.model.boosting_rates):
+            pred += (
+                    boost_rate
+                    * regressor.predict_single((torch.tensor([x_2], dtype=torch.float)).reshape(-1, 1),
+                                               i).squeeze()
+            ).cpu()
+        pred_2.append(pred)
+
+    # ich übergebe: intercept, predictions feature 1, predictions_feature 2, feature names
     # als erstes ID und target cutten
 
     # für jedes dieser features den x wert nehmen und i mittels feature names bestimmen
 
-    if task == "classification":
-        contribution = torch.tensor(model.model.init_classifier.coef_[0, i] * x.numpy(), dtype=torch.float64)
+    #if task == "classification":
+     #   contribution = torch.tensor(model.model.init_classifier.coef_[0, i] * x.numpy(), dtype=torch.float64)
         # y_hat = torch.tensor(y_hat, dtype=torch.float64)
-    else:
+    #else:
         # + self.init_classifier.intercept_
-        contribution = model.model.init_classifier.coef_[i] * x.numpy()
+     #   contribution = model.model.init_classifier.coef_[i] * x.numpy()
 
     # zurückschicken ans frontend: dictionary aus
+
+    pred_1_scalar = [t.item() for t in pred_1]
+    pred_2_scalar = [t.item() for t in pred_2]
+    return jsonify({"explanation": pred_1})
+
+def get_row_by_id(row_id):
+    # Filter the rows to find the one with the matching ID
+    if row_id is None:
+        return None
+    else:
+        filtered_rows = [row for row in rows if row['ID'] == row_id]
+    if filtered_rows:
+        # Assuming IDs are unique, return the first match
+        return filtered_rows[0]
+    else:
+        # Return None if no match is found
+        return None
 
 def calculate_distance(row1, row2):
     distance = 0.0
