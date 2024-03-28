@@ -12,7 +12,7 @@ const layout = {
     responsive: true,
 };
 let displayedFeature = document.getElementById('display-feature').value;
-var valData = null;
+var valDataID = null;
 // Variables for counterfactual axis description
 const specificValue = 0.953; // Value from Table
 const hoverTextArray = plotData[0].y.map(y => `=${(y - specificValue).toFixed(3)}<extra></extra>`);
@@ -59,45 +59,45 @@ function createHistogramPlot(hist_data, bin_edges) {
 // Event listener and feature selection
 
 
-    document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
 
-        const selectBox = document.getElementById('display-feature');
-        // Event listener for feature selection change
-        selectBox.addEventListener('change', function () {
-            displayedFeature = selectBox.value;
-            fetchFeatureData(displayedFeature);
-        });
-        predictAndGetMetrics();
-        //fetchFeatureData(selectBox.value);
-    fetchDataAndCreateTable();
-
-    const validationDataButton = document.getElementById('validation-data-button');
-    const instanceExplanationsButton = document.getElementById('instance-explanations-button');
-    const shapeFunctionsButton = document.getElementById('shape-functions-button');
-    const correlationMatrixButton = document.getElementById('correlation-matrix-button');
-
-    validationDataButton.addEventListener('click', function() {
-        hideAllContentSections();
-        document.getElementById('datagrid-table').style.display = 'block';
+    const selectBox = document.getElementById('display-feature');
+    // Event listener for feature selection change
+    selectBox.addEventListener('change', function () {
+        displayedFeature = selectBox.value;
+        fetchFeatureData(displayedFeature);
     });
+    predictAndGetMetrics();
+    //fetchFeatureData(selectBox.value);
+fetchDataAndCreateTable();
 
-    instanceExplanationsButton.addEventListener('click', function() {
-        hideAllContentSections();
-        document.getElementById('instance-explanations-content').style.display = 'block';
-        fetchAndDisplayInstanceExplanation();
-    });
+const validationDataButton = document.getElementById('validation-data-button');
+const instanceExplanationsButton = document.getElementById('instance-explanations-button');
+const shapeFunctionsButton = document.getElementById('shape-functions-button');
+const correlationMatrixButton = document.getElementById('correlation-matrix-button');
 
-    shapeFunctionsButton.addEventListener('click', function() {
-        hideAllContentSections();
-        document.getElementById('shape-functions-content').style.display = 'block';
-    });
+validationDataButton.addEventListener('click', function() {
+    hideAllContentSections();
+    document.getElementById('datagrid-table').style.display = 'block';
+});
 
-    correlationMatrixButton.addEventListener('click', function() {
-        hideAllContentSections();
-        document.getElementById('correlation-matrix-content').style.display = 'block';
-    });
+instanceExplanationsButton.addEventListener('click', function() {
+    hideAllContentSections();
+    document.getElementById('instance-explanations-content').style.display = 'block';
+    fetchAndDisplayInstanceExplanation();
+});
 
-    });
+shapeFunctionsButton.addEventListener('click', function() {
+    hideAllContentSections();
+    document.getElementById('shape-functions-content').style.display = 'block';
+});
+
+correlationMatrixButton.addEventListener('click', function() {
+    hideAllContentSections();
+    document.getElementById('correlation-matrix-content').style.display = 'block';
+});
+
+});
 function fetchFeatureData(displayedFeature) {
     fetch('/feature_data', {
         method: 'POST',
@@ -478,8 +478,8 @@ function generateColumns(data, backendColumns) {
 
 
 
-let selectedRowId_1 = null;
-let selectedRowId_2 = null;
+let selectedRowId_1 = 0;
+let selectedRowId_2 = 0;
 function createTable(data, backendColumns) {
     var table = new Tabulator("#datagrid-table", {
         data: data,
@@ -493,7 +493,7 @@ function createTable(data, backendColumns) {
                         e.preventDefault(); // Prevent the browser's context menu from appearing
                         const selectedRowId = row.getData().ID; // Store the row ID
                         const tableData = table.getData(); // Get all table data
-
+                        console.log(tableData)
                         // Send request to backend
                         fetch('/path/to/order_by_nearest', { // Replace '/path/to/order_by_nearest' with your actual backend endpoint
                             method: 'POST',
@@ -554,6 +554,7 @@ function fetchDataAndCreateTable() {
     .then(response => {
         console.log(response);
         const { data, columns } = response; // Destructure the data and columns from the response
+        valDataID = data.map(item => item.ID);
         createTable(data, columns); // Pass both data and columns to createTable
     })
     .catch(error => console.error('Error:', error));
@@ -563,33 +564,140 @@ function fetchDataAndCreateTable() {
 function fetchAndDisplayInstanceExplanation() {
     console.log("Fetching Instance Explanation");
 
-    // Assuming `data` is a global variable that holds the data you want to send
-    // Replace '/path/to/instance_explanation' with the actual backend endpoint you are targeting
+    // Assuming valDataID is available globally or in the current scope
+    console.log(valDataID);
+
+    // Prepare the explanationsContainer and clear existing content
+    const explanationsContainer = document.getElementById('instance-explanations-content');
+    explanationsContainer.innerHTML = '';
+
+    // Create the first dropdown button
+    const dropdown1 = document.createElement('select');
+    dropdown1.innerHTML = valDataID.map(id =>
+        `<option value="${id}" ${id === selectedRowId_1 ? 'selected' : ''}>${id}</option>`
+    ).join('');
+    explanationsContainer.appendChild(dropdown1);
+
+    // Placeholder for explanation after dropdown1
+    const explanation1 = document.createElement('p');
+    explanationsContainer.appendChild(explanation1);
+
+    // Vertical space between dropdowns
+    explanationsContainer.appendChild(document.createElement('br'));
+    explanationsContainer.appendChild(document.createElement('br'));
+
+    // Create the second dropdown button
+    const dropdown2 = document.createElement('select');
+    dropdown2.innerHTML = valDataID.map(id =>
+        `<option value="${id}" ${id === selectedRowId_2 ? 'selected' : ''}>${id}</option>`
+    ).join('');
+    explanationsContainer.appendChild(dropdown2);
+
+    // Placeholder for explanation after dropdown2
+    const explanation2 = document.createElement('p');
+    explanationsContainer.appendChild(explanation2);
+
+    // Add event listener to dropdown1
+    dropdown1.addEventListener('change', function() {
+        selectedRowId_1 = this.value;
+        fetchExplanation(selectedRowId_1, explanation1);
+    });
+
+    // Add event listener to dropdown2
+    dropdown2.addEventListener('change', function() {
+        selectedRowId_2 = this.value;
+        fetchExplanation(selectedRowId_2, explanation2);
+    });
+
+    // Initial fetch for the first load
+    fetchExplanation(selectedRowId_1, explanation1);
+    fetchExplanation(selectedRowId_2, explanation2)
+}
+
+function fetchExplanation(selectedRowId, chartContainer) {
     fetch('/instance_explanation', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({selectedRowId_1: selectedRowId_1,
-            selectedRowId_2: selectedRowId_2})
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+        body: JSON.stringify({selectedRow_ID: selectedRowId})
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(explanationData => {
+        console.log(explanationData.feature_names)
+        console.log(explanationData.intercept)
+        console.log(explanationData.pred_instance)
+        console.log(explanationData.target)
+        // Clear previous chart, if it exists
+        if (chartContainer.firstChild) {
+            chartContainer.removeChild(chartContainer.firstChild);
+        }
+
+        // Create a canvas element for the chart
+        const canvas = document.createElement('canvas');
+        chartContainer.appendChild(canvas);
+
+
+        const ctx = canvas.getContext('2d');
+        const myChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: explanationData.feature_names, // Array of feature names
+                datasets: [{
+                    label: 'Prediction Contribution',
+                    data: explanationData.pred_instance, // Array of prediction values
+                    backgroundColor: 'rgba(0, 123, 255, 0.5)',
+                    borderColor: 'rgba(0, 123, 255, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    yAxes: [{
+                        ticks: {
+                            beginAtZero: true
+                        }
+                    }]
+                },
+                annotation: {
+                    annotations: [{
+                        type: 'line',
+                        mode: 'horizontal',
+                        scaleID: 'y-axis-0',
+                        value: explanationData.intercept,
+                        borderColor: 'red',
+                        borderWidth: 2,
+                        label: {
+                            enabled: true,
+                            content: 'Intercept'
+                        }
+                    }]
+                },
+                plugins: {
+                    // Plugin to draw the line at the actual target value
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: function(value, context) {
+                            if (context.dataIndex === (explanationData.pred_instance.length - 1)) {
+                                return `Actual: ${explanationData.target}`;
+                            }
+                            return null;
+                        }
+                    }
+                }
             }
-            return response.json();
-        })
-        .then(explanationData => {
-            // Assuming you want to display the result in 'instance-explanations-content' div
-            const explanationsContainer = document.getElementById('instance-explanations-content');
-
-            // Clear existing content
-            explanationsContainer.innerHTML = '';
-
-            // Insert new content. Modify this according to how your data is structured and how you want it displayed
-            explanationsContainer.innerHTML = `<p>${explanationData.explanation}</p>`; // Example of displaying the explanation
-        })
+        });
+    })
+    .catch(error => console.error('Error:', error));
 }
+
+
 
 
 function hideAllContentSections() {

@@ -487,9 +487,10 @@ def load_data_grid_instances():
 
 @app.route('/instance_explanation', methods=['POST'])
 def instance_explanation():
-    selectedRowId_1 = request.json['selectedRowId_1']
-    selectedRowId_2 = request.json['selectedRowId_2']
-    explanation = f"Generated explanation based on input data: {selectedRowId_1}"
+    selectedRowId = request.json['selectedRow_ID']
+
+    #selectedRowId_2 = request.json['selectedRowId_2']
+    #explanation = f"Generated explanation based on input data: {selectedRowId}"
 
     # Generate predictions
 
@@ -500,9 +501,12 @@ def instance_explanation():
     # Return the explanation as JSON
 
     intercept = adapter.model.init_classifier.intercept_
-    row_data_1 = get_row_by_id(selectedRowId_1) if selectedRowId_1 is not None else None
-    row_data_2 = get_row_by_id(selectedRowId_2) if selectedRowId_2 is not None else None
-
+    global rows
+    row_data = get_row_by_id(int(selectedRowId)) if selectedRowId is not None else None
+    print(selectedRowId)
+    print(row_data)
+    target = row_data['target']
+    prediction = row_data['prediction']
 
     #selectedRowId = request.json['selectedRowId']
     # mit Auswahl Button die prediction für diese Zeile durchführen (wenn ausgewählt, dann wird auch predicted)
@@ -510,59 +514,45 @@ def instance_explanation():
 
     intercept = adapter.model.init_classifier.intercept_
 
-    global rows
+
     # and key!= prediction
     #feature_names = [key for key in rows[0].keys() if key != 'ID' and key != 'target'] if rows else []
     feature_names = adapter.feature_names
     # Initialize lists to hold the feature values
-    values_1 = [0] * len(feature_names)
-    values_2 = [0] * len(feature_names)
+    values = [0] * len(feature_names)
 
     # Directly process row_data_1 and row_data_2
-    if row_data_1 is not None:
-        values_1 = [row_data_1.get(feature, 0) for feature in feature_names if feature and feature != "target"]
+    if row_data is not None:
+        values = [row_data.get(feature, 0) for feature in feature_names if feature and feature != "target"]
 
-    if row_data_2 is not None:
-        values_2 = [row_data_2.get(feature, 0) for feature in feature_names if feature and feature != "target"]
-    pred_1 = []
-    pred_2 = []
+    pred_list = []
 
     for position, name in enumerate(feature_names):
         i = feature_names.index(name)
-        x_1 = values_1[position]
+        x = values[position]
         pred = torch.tensor([0], dtype=torch.float)
         for regressor, boost_rate in zip(adapter.model.regressors, adapter.model.boosting_rates):
             pred += (
                     boost_rate
-                    * regressor.predict_single((torch.tensor([x_1], dtype=torch.float)).reshape(-1, 1),
+                    * regressor.predict_single((torch.tensor([x], dtype=torch.float)).reshape(-1, 1),
                                                i).squeeze()
             ).cpu()
 
-        pred_1.append(pred)
-        x_2 = values_2[position]
-        pred = torch.tensor([0], dtype=torch.float)
-        for regressor, boost_rate in zip(adapter.model.regressors, adapter.model.boosting_rates):
-            pred += (
-                    boost_rate
-                    * regressor.predict_single((torch.tensor([x_2], dtype=torch.float)).reshape(-1, 1),
-                                               i).squeeze()
-            ).cpu()
-        pred_2.append(pred)
-    print(pred_1)
-    print(pred_2)
+        pred_list.append(pred)
+
     # ich übergebe: intercept, predictions feature 1, predictions_feature 2, feature names
 
 
     # zurückschicken ans frontend: dictionary aus
 
-    pred_1_scalar = [t.item() for t in pred_1]
-    pred_2_scalar = [t.item() for t in pred_2]
-    return jsonify({"pred_instance_1": pred_1_scalar, "pred_instance_2": pred_2_scalar,
-                   "feature_names": feature_names, "intercept": intercept})
+    pred_scalar = [t.item() for t in pred_list]
+    return jsonify({"pred_instance": pred_scalar, "feature_names": feature_names,
+                    "intercept": intercept, "target": target, "prediction": prediction})
 
 def get_row_by_id(row_id):
     # Filter the rows to find the one with the matching ID
     global rows
+    print(rows)
     for row in rows:
         if row["ID"] == row_id:
             return row
