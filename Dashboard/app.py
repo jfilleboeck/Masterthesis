@@ -469,8 +469,8 @@ def load_data_grid_instances():
     # Ensure that the target variable (or any other numerical columns) is rounded as well
     combined_data = combined_data.round(3)
 
-    combined_data.insert(0, 'ID', range(1, 1 + len(combined_data)))
-
+    combined_data.insert(0, 'ID', combined_data.index)
+    global rows
     # Convert DataFrame to dictionary
     rows = combined_data.to_dict(orient='records')
     for row in rows:
@@ -500,21 +500,20 @@ def instance_explanation():
     # Return the explanation as JSON
 
     intercept = adapter.model.init_classifier.intercept_
-    # Now, retrieve the rows for your selected IDs
-    row_data_1 = get_row_by_id(selectedRowId_1)
-    print(row_data_1)
-    row_data_2 = get_row_by_id(selectedRowId_2)
+    row_data_1 = get_row_by_id(selectedRowId_1) if selectedRowId_1 is not None else None
+    row_data_2 = get_row_by_id(selectedRowId_2) if selectedRowId_2 is not None else None
+
+
     #selectedRowId = request.json['selectedRowId']
     # mit Auswahl Button die prediction für diese Zeile durchführen (wenn ausgewählt, dann wird auch predicted)
     # per Rechtsklick kann man den Auswahl Button triggern
 
     intercept = adapter.model.init_classifier.intercept_
-    print(intercept)
 
     global rows
     # and key!= prediction
-    feature_names = [key for key in rows[0].keys() if key != 'ID' and key != 'target'] if rows else []
-
+    #feature_names = [key for key in rows[0].keys() if key != 'ID' and key != 'target'] if rows else []
+    feature_names = adapter.feature_names
     # Initialize lists to hold the feature values
     values_1 = [0] * len(feature_names)
     values_2 = [0] * len(feature_names)
@@ -527,13 +526,8 @@ def instance_explanation():
         values_2 = [row_data_2.get(feature, 0) for feature in feature_names if feature and feature != "target"]
     pred_1 = []
     pred_2 = []
-    print(feature_names)
-    print()
-    print()
-    print()
-    print(values_1)
+
     for position, name in enumerate(feature_names):
-        print(name, position)
         i = feature_names.index(name)
         x_1 = values_1[position]
         pred = torch.tensor([0], dtype=torch.float)
@@ -554,37 +548,25 @@ def instance_explanation():
                                                i).squeeze()
             ).cpu()
         pred_2.append(pred)
-
+    print(pred_1)
+    print(pred_2)
     # ich übergebe: intercept, predictions feature 1, predictions_feature 2, feature names
-    # als erstes ID und target cutten
 
-    # für jedes dieser features den x wert nehmen und i mittels feature names bestimmen
-
-    #if task == "classification":
-     #   contribution = torch.tensor(model.model.init_classifier.coef_[0, i] * x.numpy(), dtype=torch.float64)
-        # y_hat = torch.tensor(y_hat, dtype=torch.float64)
-    #else:
-        # + self.init_classifier.intercept_
-     #   contribution = model.model.init_classifier.coef_[i] * x.numpy()
 
     # zurückschicken ans frontend: dictionary aus
 
     pred_1_scalar = [t.item() for t in pred_1]
     pred_2_scalar = [t.item() for t in pred_2]
-    return jsonify({"explanation": pred_1})
+    return jsonify({"pred_instance_1": pred_1_scalar, "pred_instance_2": pred_2_scalar,
+                   "feature_names": feature_names, "intercept": intercept})
 
 def get_row_by_id(row_id):
     # Filter the rows to find the one with the matching ID
-    if row_id is None:
-        return None
-    else:
-        filtered_rows = [row for row in rows if row['ID'] == row_id]
-    if filtered_rows:
-        # Assuming IDs are unique, return the first match
-        return filtered_rows[0]
-    else:
-        # Return None if no match is found
-        return None
+    global rows
+    for row in rows:
+        if row["ID"] == row_id:
+            return row
+    return None
 
 def calculate_distance(row1, row2):
     distance = 0.0
