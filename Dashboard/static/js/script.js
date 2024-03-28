@@ -564,57 +564,55 @@ function fetchDataAndCreateTable() {
 function fetchAndDisplayInstanceExplanation() {
     console.log("Fetching Instance Explanation");
 
-    // Assuming valDataID is available globally or in the current scope
-    console.log(valDataID);
-
-    // Prepare the explanationsContainer and clear existing content
     const explanationsContainer = document.getElementById('instance-explanations-content');
     explanationsContainer.innerHTML = '';
 
-    // Create the first dropdown button
+    // Create the first dropdown and target display
     const dropdown1 = document.createElement('select');
     dropdown1.innerHTML = valDataID.map(id =>
         `<option value="${id}" ${id === selectedRowId_1 ? 'selected' : ''}>${id}</option>`
     ).join('');
     explanationsContainer.appendChild(dropdown1);
 
-    // Placeholder for explanation after dropdown1
+    const targetDisplay1 = document.createElement('span'); // Element to display target value
+    explanationsContainer.appendChild(targetDisplay1); // Append it right after the dropdown
+
     const explanation1 = document.createElement('p');
     explanationsContainer.appendChild(explanation1);
 
-    // Vertical space between dropdowns
     explanationsContainer.appendChild(document.createElement('br'));
     explanationsContainer.appendChild(document.createElement('br'));
 
-    // Create the second dropdown button
+    // Create the second dropdown and target display
     const dropdown2 = document.createElement('select');
     dropdown2.innerHTML = valDataID.map(id =>
         `<option value="${id}" ${id === selectedRowId_2 ? 'selected' : ''}>${id}</option>`
     ).join('');
     explanationsContainer.appendChild(dropdown2);
 
-    // Placeholder for explanation after dropdown2
+    const targetDisplay2 = document.createElement('span'); // Element to display target value
+    explanationsContainer.appendChild(targetDisplay2); // Append it right after the dropdown
+
     const explanation2 = document.createElement('p');
     explanationsContainer.appendChild(explanation2);
 
-    // Add event listener to dropdown1
+    // Event listeners for dropdowns
     dropdown1.addEventListener('change', function() {
         selectedRowId_1 = this.value;
-        fetchExplanation(selectedRowId_1, explanation1);
+        fetchExplanation(selectedRowId_1, explanation1, targetDisplay1);
     });
 
-    // Add event listener to dropdown2
     dropdown2.addEventListener('change', function() {
         selectedRowId_2 = this.value;
-        fetchExplanation(selectedRowId_2, explanation2);
+        fetchExplanation(selectedRowId_2, explanation2, targetDisplay2);
     });
 
     // Initial fetch for the first load
-    fetchExplanation(selectedRowId_1, explanation1);
-    fetchExplanation(selectedRowId_2, explanation2)
+    fetchExplanation(selectedRowId_1, explanation1, targetDisplay1);
+    fetchExplanation(selectedRowId_2, explanation2, targetDisplay2);
 }
 
-function fetchExplanation(selectedRowId, chartContainer) {
+function fetchExplanation(selectedRowId, chartContainer, targetDisplay) {
     fetch('/instance_explanation', {
         method: 'POST',
         headers: {
@@ -629,28 +627,36 @@ function fetchExplanation(selectedRowId, chartContainer) {
         return response.json();
     })
     .then(explanationData => {
-        console.log(explanationData.feature_names)
-        console.log(explanationData.intercept)
-        console.log(explanationData.pred_instance)
-        console.log(explanationData.target)
+        console.log(explanationData.feature_names);
+        console.log(explanationData.intercept);
+        console.log(explanationData.pred_instance);
+        console.log(explanationData.target);
+
+        // Display the target value
+        targetDisplay.innerHTML = `     ID: ${selectedRowId}, Prediction: ${explanationData.prediction}, 
+        Target: ${explanationData.target}, Intercept: <span style="color: red;">${explanationData.intercept}</span>`;
+
         // Clear previous chart, if it exists
         if (chartContainer.firstChild) {
             chartContainer.removeChild(chartContainer.firstChild);
         }
 
-        // Create a canvas element for the chart
+        chartContainer.style.maxWidth = '450px'; // Set the max width for the chart container
+        chartContainer.style.height = 'auto'; // Set height to auto to maintain aspect ratio
+
+
+        // Create and append the chart
         const canvas = document.createElement('canvas');
         chartContainer.appendChild(canvas);
-
 
         const ctx = canvas.getContext('2d');
         const myChart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: explanationData.feature_names, // Array of feature names
+                labels: explanationData.feature_names,
                 datasets: [{
                     label: 'Prediction Contribution',
-                    data: explanationData.pred_instance, // Array of prediction values
+                    data: explanationData.pred_instance,
                     backgroundColor: 'rgba(0, 123, 255, 0.5)',
                     borderColor: 'rgba(0, 123, 255, 1)',
                     borderWidth: 1
@@ -658,36 +664,25 @@ function fetchExplanation(selectedRowId, chartContainer) {
             },
             options: {
                 scales: {
-                    yAxes: [{
-                        ticks: {
-                            beginAtZero: true
-                        }
-                    }]
-                },
-                annotation: {
-                    annotations: [{
-                        type: 'line',
-                        mode: 'horizontal',
-                        scaleID: 'y-axis-0',
-                        value: explanationData.intercept,
-                        borderColor: 'red',
-                        borderWidth: 2,
-                        label: {
-                            enabled: true,
-                            content: 'Intercept'
-                        }
-                    }]
+                    y: { // Correctly updated for Chart.js 3.x syntax
+                        beginAtZero: true
+                    }
                 },
                 plugins: {
-                    // Plugin to draw the line at the actual target value
-                    datalabels: {
-                        anchor: 'end',
-                        align: 'top',
-                        formatter: function(value, context) {
-                            if (context.dataIndex === (explanationData.pred_instance.length - 1)) {
-                                return `Actual: ${explanationData.target}`;
+                    annotation: {
+                        annotations: {
+                            line1: { // Annotation ID
+                                type: 'line',
+                                yMin: explanationData.intercept,
+                                yMax: explanationData.intercept,
+                                borderColor: 'red',
+                                borderWidth: 2,
+                                label: {
+                                    enabled: false,
+                                    content: 'Intercept',
+                                    position: 'end'
+                                }
                             }
-                            return null;
                         }
                     }
                 }
@@ -696,7 +691,6 @@ function fetchExplanation(selectedRowId, chartContainer) {
     })
     .catch(error => console.error('Error:', error));
 }
-
 
 
 

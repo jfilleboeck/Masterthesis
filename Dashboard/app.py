@@ -512,7 +512,7 @@ def instance_explanation():
     # mit Auswahl Button die prediction für diese Zeile durchführen (wenn ausgewählt, dann wird auch predicted)
     # per Rechtsklick kann man den Auswahl Button triggern
 
-    intercept = adapter.model.init_classifier.intercept_
+    intercept = round(adapter.model.init_classifier.intercept_, 3)
 
 
     # and key!= prediction
